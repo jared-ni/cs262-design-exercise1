@@ -26,6 +26,8 @@ def start():
         return 
     
     connection = connect()
+
+    
     while True:
         msg = input("Message (q for quit): ")
         if msg == 'q':

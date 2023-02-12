@@ -33,7 +33,7 @@ def communicate_to_server(client):
         client.sendall(username.encode(FORMAT))
     else:
         print("Username cannot be empty")
-
+    
     threading.Thread(target=listen_for_server_messages, args=(client, )).start()
     send_message_to_server(client)
 
@@ -47,6 +47,10 @@ def main():
         print(f"UNABLE TO CONNECT TO SERVER {SERVER} AND PORT {PORT}")
 
     communicate_to_server(client)
+
+
+
+
 
 if __name__ == "__main__":
     main()
