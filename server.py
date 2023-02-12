@@ -9,6 +9,8 @@ FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!*DISCONNECT*"
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# allows for reconnections
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(ADDR)
 
 
@@ -16,42 +18,47 @@ clients = {}
 clients_lock = threading.Lock()
 
 
+def handle_account(conn):
+    # registration (optional)
+    account = conn.recv(1024).decode(FORMAT)
+    if account:
+        reg_type, username, password = account.split("~")
+        if reg_type == "register":
+            if username in clients:
+                # if username already exists, send error message
+                conn.sendall("Username already exists!".encode(FORMAT))
+                return
+            # add new user to clients dictionary
+            clients[username] = {
+                "password": password.encode(FORMAT), 
+                "client": conn
+            }
+            conn.send(f"Successfully registered {username}!".encode(FORMAT))
+        elif reg_type == "login":
+            if username not in clients:
+                # if username doesn't exist, send error message
+                conn.sendall("Username does not exist!".encode(FORMAT))
+                return
+            if clients[username]["password"] != password.encode(FORMAT):
+                # if password is incorrect, send error message
+                conn.sendall("Incorrect password!".encode(FORMAT))
+                return
+            conn.send(f"Successfully logged in {username}!".encode(FORMAT))
+    return username
+
 # handle client in separate thread
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
     try: 
-        # registration (optional)
-        account = conn.recv(1024).decode(FORMAT)
-        if account:
-            reg_type, username, password = account.split("~")
-            if reg_type == "register":
-                if username in clients:
-                    # if username already exists, send error message
-                    conn.sendall("Username already exists!".encode(FORMAT))
-                    return
-                # add new user to clients dictionary
-                clients[username] = {
-                    "password": password.encode(FORMAT), 
-                    "client": conn
-                }
-                conn.send(f"Successfully registered {username}!".encode(FORMAT))
-            elif reg_type == "login":
-                if username not in clients:
-                    # if username doesn't exist, send error message
-                    conn.sendall("Username does not exist!".encode(FORMAT))
-                    return
-                if clients[username]["password"] != password.encode(FORMAT):
-                    # if password is incorrect, send error message
-                    conn.sendall("Incorrect password!".encode(FORMAT))
-                    return
-                conn.send(f"Successfully logged in {username}!".encode(FORMAT))
+        handle_account(conn)
+        username = handle_account(conn)
 
         connected = True
         while connected:
             msg = conn.recv(1024).decode(FORMAT)
             if not msg:
-                break
+                continue
             
             if msg == DISCONNECT_MESSAGE:
                 connected = False
@@ -59,13 +66,15 @@ def handle_client(conn, addr):
         
             # find receiver and message
             print(f"[{addr, username}] {msg}")
-            message = conn.recv(1024).decode(FORMAT)
-            receiverEnd = message.find(":")
-            receiver = message[:receiverEnd]
-            message = message[receiverEnd+1:]
 
+            receiverEnd = msg.find(":")
+            receiver = msg[:receiverEnd]
+            message = msg[receiverEnd+1:]
+
+            if receiver not in clients:
+                continue
             receiver_socket = clients[receiver]["client"]
-            receiver_socket.sendall(f"[{addr}] {msg}".encode(FORMAT))
+            receiver_socket.send(f"[{username}] ~:> {message}".encode(FORMAT))
 
     finally:
         # with clients_lock:
