@@ -17,6 +17,7 @@ def listen_for_server_messages(client):
             print("The message from server is empty")
 
 
+# while loop for sending message to the server
 def send_message_to_server(client):
     while True:
         message = input()
@@ -34,10 +35,12 @@ def communicate_to_server(client):
     else:
         print("Username cannot be empty")
     
+    # new thread for listening to server messages, so input and listening can happen concurrently
     threading.Thread(target=listen_for_server_messages, args=(client, )).start()
     send_message_to_server(client)
 
 
+# establish client socket and connect to server
 def main():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -48,9 +51,7 @@ def main():
 
     communicate_to_server(client)
 
-
-
-
+ 
 
 if __name__ == "__main__":
     main()

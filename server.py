@@ -1,5 +1,6 @@
 import threading
 import socket
+import time
 
 PORT = 11112
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -13,7 +14,7 @@ wired protocol definitions:
 2. operation code (1 bytes)
 3. header length (1 byte)
 4. message length (2 bytes)
-4. message data (message length bytes)
+5. message data (message length bytes)
 """
 # 1. version
 VERSION = 1
@@ -24,8 +25,9 @@ LIST = 3
 DELETE = 4
 SEND = 5
 RECEIVE = 6
-DISCONNECT = 7
-defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, DISCONNECT])
+SERVER_MESSAGE = 7
+DISCONNECT = 8
+defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, DISCONNECT])
 p_sizes = {
     "ver": 1,
     "op": 1,
@@ -39,99 +41,161 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(ADDR)
 
-# dictionary for storing client connections
+# dictionary for storing user information
+users = {}
+# dictionary for storing clients. maps socket to user
 clients = {}
 clients_lock = threading.Lock()
 
+
+# send message to client as per standards defined by the wired protocol
+def send(client, msg, operation_code):
+    # 1. version
+    version = VERSION.to_bytes(1, BYTE_ORDER)
+    # 2. operation code
+    operation = operation_code.to_bytes(1, BYTE_ORDER)
+    # 4. message data and message length
+    message = msg.encode(FORMAT)
+    message_length = len(message).to_bytes(2, BYTE_ORDER)
+    # 3. header length 
+    header_length = (1 + len(version) + len(operation) + len(message_length)).to_bytes(1, BYTE_ORDER)
+    # 5. send message
+    client.send(version + operation + header_length + message_length + message)
+
+
 # handle account registration and login
-def handle_account(conn):
-    # registration (optional)
-    account = conn.recv(1024).decode(FORMAT)
-    if account:
-        reg_type, username, password = account.split("~")
-        if reg_type == "register":
-            if username in clients:
-                # if username already exists, send error message
-                conn.sendall("Username already exists!".encode(FORMAT))
-                return
-            # add new user to clients dictionary
-            clients[username] = {
-                "password": password.encode(FORMAT), 
-                "client": conn
-            }
-            conn.send(f"Successfully registered {username}!".encode(FORMAT))
-        elif reg_type == "login":
-            if username not in clients:
-                # if username doesn't exist, send error message
-                conn.sendall("Username does not exist!".encode(FORMAT))
-                return
-            if clients[username]["password"] != password.encode(FORMAT):
-                # if password is incorrect, send error message
-                conn.sendall("Incorrect password!".encode(FORMAT))
-                return
-            conn.send(f"Successfully logged in {username}!".encode(FORMAT))
-    return username
+def handle_register(client, payload):
+    if not payload:
+        return
+    try:
+        username, password = payload.split("~")
+        # if username already exists, send error message
+        if username in users:
+            send(client, "Username already exists!", SERVER_MESSAGE)
+            return
+        # add new user to clients dictionary
+        users[username] = {
+            # TODO: hash password
+            "password": password.encode(FORMAT), 
+            "client": client,
+            "logged_in": False,
+            "messages": [],
+            "unloaded_messages": []
+        }
+        send(client, f"Successfully registered {username}!", SERVER_MESSAGE)
+    except ValueError:
+        return
+    
+
+# handle account login
+def handle_login(client, payload):
+    if not payload:
+        return 
+    try:
+        username, password = payload.split("~")
+        # if username doesn't exist, send error message
+        if username not in users:
+            send(client, "Username does not exist!", SERVER_MESSAGE)
+            return
+        # TODO: hash password
+        if users[username]["password"] != password.encode(FORMAT):
+            send(client, "Incorrect password!", SERVER_MESSAGE)
+            return
+        # TODO: lock clients dictionary
+        users[username]["logged_in"] = True
+        # save client's current logged in username
+        clients[client] = username
+        send(client, f"Successfully logged in {username}!", SERVER_MESSAGE)
+    except:
+        return
+    
+
+# handle sending messages
+def handle_send(client, payload):
+    print(f"handle_send: {client}, {payload}")
+
+    if client not in clients:
+        print("!")
+        send(client, "You are not logged in!", SERVER_MESSAGE)
+        return
+    if not payload:
+        print("?")
+        return
+    
+    # try:
+        # get receiver and message
+    receiverEnd = payload.find(":")
+    message = payload[receiverEnd+1:]
+    if receiverEnd == -1 or not message:
+        send(client, "Syntax for sending a message to a user: <username>: <message>", SERVER_MESSAGE)
+        return
+    receiver = payload[:receiverEnd]
+    if receiver not in users:
+        send(client, f"User {receiver} does not exist!", SERVER_MESSAGE)
+        return
+
+    print("message: " + receiver + str(receiverEnd) + message)
+    # send message to receiver
+    # TODO: what to do when receiver is not logged in?
+    receiver_socket = users[receiver]["client"]
+    send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
+
+    # except Exception as e:
+    #     print(e)
+    #     client.send(f"Error: {e} on line {e.args}".encode(FORMAT))
+    #     return
+
 
 # handle client in separate thread
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
     try: 
-        # Parse wired protocol header
-        # 1. version
-        version = int.from_bytes(conn.recv(p_sizes["ver"]), BYTE_ORDER)
-        if version != VERSION:
-            print(f"Version {version} not supported!")
-            # TODO: send message to client to disconnect it
-            return
-        # 2. operation code
-        operation = int.from_bytes(conn.recv(p_sizes["op"]), BYTE_ORDER)
-        if operation not in defined_operations:
-            print(f"Operation {operation} not supported!")
-            # TODO: send message to client to disconnect it
-            return 
-        # TODO: not sure what to do with header_length
-        header_length = int.from_bytes(conn.recv(p_sizes["h_len"]), BYTE_ORDER)
-        # 3. message length
-        message_length = int.from_bytes(conn.recv(p_sizes["m_len"]), BYTE_ORDER)
-        # 4. message data
-        message_data = conn.recv(message_length).decode(FORMAT)
-
-        print(f"version: {version}")
-        print(f"operation: {operation}")
-        print(f"header_length: {header_length}")
-        print(f"message_length: {message_length}")
-        print(f"message_data: {message_data}")
-
-
-        handle_account(conn)
-        username = handle_account(conn)
-
         connected = True
         while connected:
-            msg = conn.recv(1024).decode(FORMAT)
-            if not msg:
-                continue
-            
+            # Parse wired protocol header
             # TODO: need to break when get disconnect message
-        
-            # find receiver and message
-            print(f"[{addr, username}] {msg}")
+            # 1. client version number must match server version number
+            version = int.from_bytes(conn.recv(p_sizes["ver"]), BYTE_ORDER)
+            if version != VERSION:
+                print(f"Version {version} not supported!")
+                # TODO: send message to client to disconnect it
+                return
+            # 2. operation code
+            operation = int.from_bytes(conn.recv(p_sizes["op"]), BYTE_ORDER)
+            if operation not in defined_operations:
+                print(f"Operation {operation} not supported!")
+                # TODO: send message to client to disconnect it
+                return 
+            # TODO: not sure what to do with header_length
+            _header_length = int.from_bytes(conn.recv(p_sizes["h_len"]), BYTE_ORDER)
+            # 3. message length
+            message_length = int.from_bytes(conn.recv(p_sizes["m_len"]), BYTE_ORDER)
+            # 4. message data
+            message_data = conn.recv(message_length).decode(FORMAT)
 
-            receiverEnd = msg.find(":")
-            receiver = msg[:receiverEnd]
-            message = msg[receiverEnd+1:]
-
-            if receiver not in clients:
-                continue
-            receiver_socket = clients[receiver]["client"]
-            receiver_socket.send(f"[{username}] ~:> {message}".encode(FORMAT))
+            if operation == REGISTER:
+                handle_register(conn, message_data)
+            elif operation == LOGIN:
+                handle_login(conn, message_data)
+            elif operation == SEND:
+                handle_send(conn, message_data)
 
     finally:
-        # with clients_lock:
-        #     clients.remove(conn)
+        # TODO: What do we do when client disconnects?
         print(f"[{addr}] disconnected.")
+        # log client out
+        current_user = clients[conn]
+        users[current_user]["logged_in"] = False
+        # currently, user can only log in on a single device
+        users[current_user]['client'] = None
+        # remove client from clients dictionary
+        del clients[conn]
+
+        send(conn, f"[CLIENT DISCONNECTED]", SERVER_MESSAGE)
+        time.sleep(2)
         conn.close()
+
 
 
 # handle clients
@@ -148,4 +212,6 @@ def start():
         thread = threading.Thread(target=handle_client, args=(conn, addr))
         thread.start()
 
-start()
+
+if __name__ == "__main__":
+    start()

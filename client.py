@@ -25,8 +25,15 @@ LIST = 3
 DELETE = 4
 SEND = 5
 RECEIVE = 6
-DISCONNECT = 7
-defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, DISCONNECT])
+SERVER_MESSAGE = 7
+DISCONNECT = 8
+defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, DISCONNECT])
+p_sizes = {
+    "ver": 1,
+    "op": 1,
+    "h_len": 1,
+    "m_len": 2
+}
 
 # 1. connect client to server
 def connect():
@@ -55,22 +62,46 @@ def send(client, msg, operation_code):
     client.send(version + operation + header_length + message_length + message)
 
 
-# listens to messages on another thread while allowing user to send messages
-def communicate_to_server(client):
 
-    threading.Thread(target=listen_for_server_messages, args=(client, )).start()
+# listens to messages on another thread while allowing user to send messages
+def send_to_server(client):
+
+    threading.Thread(target=listen_from_server, args=(client, )).start()
     while True:
         message = input()
         if message:
             send(client, message, SEND)
 
 
-def listen_for_server_messages(client):
+# a separate thread for listening to messages from server that are par the wired protocol
+def listen_from_server(client):
     while True:
-        message = client.recv(1024).decode(FORMAT)
-        if message:
-            username, content = message.split("~:>")
-            print(f"[{username}]> {content}")
+        version = int.from_bytes(client.recv(p_sizes["ver"]), BYTE_ORDER)
+        if version != VERSION:
+            print(f"Server version {version} is not compatible with client version {VERSION}.")
+            # TODO: send message to server to disconnect it
+            return
+        # 2. operation code
+        operation = int.from_bytes(client.recv(p_sizes["op"]), BYTE_ORDER)
+        if operation not in defined_operations:
+            print(f"Operation {operation} not supported!")
+            # TODO: send message to client to disconnect it
+            return 
+        # TODO: not sure what to do with header_length
+        _header_length = int.from_bytes(client.recv(p_sizes["h_len"]), BYTE_ORDER)
+        # 3. message length
+        message_length = int.from_bytes(client.recv(p_sizes["m_len"]), BYTE_ORDER)
+        # 4. message data
+        message_data = client.recv(message_length).decode(FORMAT)
+
+        # if receiving from another client, print out
+        if operation == RECEIVE:
+            username, content = message_data.split("~:>")
+            print(f"{username}> {content}")
+        # if receiving from server, print differently
+        elif operation == SERVER_MESSAGE:
+            print("[SERVER] " + message_data)
+
 
 def start():
     # returns client socket on success
@@ -92,11 +123,8 @@ def start():
             if password != re_password:
                 print("Passwords do not match.")
                 continue
-
-
-            send(client, f"register~{username}~{password}", REGISTER)
-
-
+            # TODO: Hash password
+            send(client, f"{username}~{password}", REGISTER)
 
             # wait for server response
             registered = False
@@ -122,7 +150,8 @@ def start():
                 print("Username cannot be empty.")
                 continue
             password = input("Password: ")
-            send(client, f"login~{username}~{password}", LOGIN)
+            send(client, f"{username}~{password}", LOGIN)
+
             loggedin = False
             while not loggedin:
                 message = client.recv(1024).decode(FORMAT)
@@ -138,7 +167,7 @@ def start():
                 print(message)
                 break
     print("CHECK POINT")
-    communicate_to_server(client)
+    send_to_server(client)
 
     # wait for server response
     # while True:

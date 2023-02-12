@@ -10,3 +10,16 @@ Jared Ni, Bryan Han
 
 
 - For encoding the header components of the wired protocol, how do I calculate by bytes in Python? Or, can I simply separate each of the protocol components with a special symbol? 
+
+
+2/12 
+- I realized a design flaw: must separate client socket from the storing of user information. I decided to have another dictionary to map client_sockets to the respective accounts that they logged in. 
+- I am improving the wired protocol and standardizing the server code for now. Soon, everything will be standardized. 
+TODOS: 
+    - wrap more try catch blocks in error-prone functions
+    - finish abstracting server functions
+    - finalize how users and client sockets are associated
+    - Lock the two dictionaries while they are being edited
+    - Should we make it so that a user cannot login on two different clients? Must think about it
+    - Push messages not directly to socket but to the queue list if client is not logged in. 
+    - should we have a buffer in front of each actual message, so we know for sure that we are parsing the actual message? 
