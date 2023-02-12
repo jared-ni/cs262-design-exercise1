@@ -23,3 +23,8 @@ TODOS:
     - Should we make it so that a user cannot login on two different clients? Must think about it
     - Push messages not directly to socket but to the queue list if client is not logged in. 
     - should we have a buffer in front of each actual message, so we know for sure that we are parsing the actual message? 
+
+How should I abstract the code for registering and logging in? Should they be part of the while loop that handles incoming wired protocol messages? 
+My thoughts on client side structure: 
+    - After connecting, asks user whether they want to register. Then, ask them to log in. Whenever they want to register or login another account, they may do so with commands. 
+    - After register/login, user enters while loop, where it follows the structure for server side socket.
