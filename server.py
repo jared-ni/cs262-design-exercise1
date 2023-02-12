@@ -1,23 +1,34 @@
 import threading
 import socket
-from collections import defaultdict
 
 PORT = 11112
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = "utf-8"
-DISCONNECT_MESSAGE = "!*DISCONNECT*"
 
+# wired protocol definitions: 
+# 1. version
+VERSION = 1.0
+# 2. operation_codes
+REGISTER = 1
+LOGIN = 2
+LIST = 3
+DELETE = 4
+SEND = 5
+RECEIVE = 6
+DISCONNECT = 7
+
+# bind server to current address
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # allows for reconnections
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(ADDR)
 
-
+# dictionary for storing client connections
 clients = {}
 clients_lock = threading.Lock()
 
-
+# handle account registration and login
 def handle_account(conn):
     # registration (optional)
     account = conn.recv(1024).decode(FORMAT)
