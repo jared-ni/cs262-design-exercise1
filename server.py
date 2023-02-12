@@ -2,7 +2,7 @@ import threading
 import socket
 from collections import defaultdict
 
-PORT = 11111
+PORT = 11112
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = "utf-8"
@@ -12,7 +12,7 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(ADDR)
 
 
-clients = defaultdict(dict)
+clients = {}
 clients_lock = threading.Lock()
 
 
@@ -52,15 +52,21 @@ def handle_client(conn, addr):
             msg = conn.recv(1024).decode(FORMAT)
             if not msg:
                 break
-
+            
             if msg == DISCONNECT_MESSAGE:
                 connected = False
                 break
-            
-            print(f"[{addr}] {msg}")
-            with clients_lock:
-                for client in clients:
-                    client.sendall(f"[{addr}] {msg}".encode(FORMAT))
+        
+            # find receiver and message
+            print(f"[{addr, username}] {msg}")
+            message = conn.recv(1024).decode(FORMAT)
+            receiverEnd = message.find(":")
+            receiver = message[:receiverEnd]
+            message = message[receiverEnd+1:]
+
+            receiver_socket = clients[receiver]["client"]
+            receiver_socket.sendall(f"[{addr}] {msg}".encode(FORMAT))
+
     finally:
         # with clients_lock:
         #     clients.remove(conn)
