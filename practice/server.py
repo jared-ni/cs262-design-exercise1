@@ -11,6 +11,7 @@ HEADER = 64
 PORT = 5050
 # get current server's IPv4 address
 SERVER = socket.gethostbyname(socket.gethostname())
+print("SERVER: ", SERVER)
 # bind socket to port address, anything that connects with addr will hit this socket
 ADDR = (SERVER, PORT)
 FORMAT = 'utf-8'
