@@ -43,11 +43,6 @@ def listen_for_server_messages(client):
             print(f"[{username}]> {content}")
 
 def start():
-    # ask user if they want to connect
-    answer = input('Would you like to connect? (yes/no) ')
-    if answer.lower() != 'yes':
-        return 
-
     # returns client socket on success
     client = connect()
     if client is None:
@@ -88,15 +83,14 @@ def start():
                 continue
             password = input("Password: ")
             send(client, f"login~{username}~{password}")
-            while True:
-                message = client.recv(1024).decode(FORMAT)
-                if message:
-                    print(message)
-                    break
-            break
+            message = client.recv(1024).decode(FORMAT)
+            if message:
+                print(message)
+                break
         else:
             continue
 
+    print("CHECK POINT")
     communicate_to_server(client)
 
     # wait for server response
