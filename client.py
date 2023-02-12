@@ -25,6 +25,23 @@ def send(client, msg):
     client.send(message)
 
 
+# listens to messages on another thread while allowing user to send messages
+def communicate_to_server(client):
+
+    threading.Thread(target=listen_for_server_messages, args=(client, )).start()
+    while True:
+        message = input()
+        if message:
+            send(client, message)
+
+
+def listen_for_server_messages(client):
+    while True:
+        message = client.recv(1024).decode(FORMAT)
+        if message:
+            username, content = message.split("~:>")
+            print(f"[{username}]> {content}")
+
 def start():
     # returns client socket on success
     client = connect()
@@ -83,16 +100,21 @@ def start():
         elif login.lower() == 'no':
             break
 
-    # wait for server response
-    while True:
-        msg = input("Message (q for quit): ")
-        if msg == 'q':
-            break
-        send(client, msg)
+        else:
+            continue
 
-    send(client, DISCONNECT_MESSAGE)
-    time.sleep(1)
-    print('Disconnected from server.')
+    communicate_to_server(client)
+
+    # wait for server response
+    # while True:
+    #     msg = input("Message (q for quit): ")
+    #     if msg == 'q':
+    #         break
+    #     send(client, msg)
+
+    # send(client, DISCONNECT_MESSAGE)
+    # time.sleep(1)
+    # print('Disconnected from server.')
 
 
 start()

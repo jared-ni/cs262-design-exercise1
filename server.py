@@ -9,6 +9,8 @@ FORMAT = "utf-8"
 DISCONNECT_MESSAGE = "!*DISCONNECT*"
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# allows for reconnections
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(ADDR)
 
 
@@ -51,7 +53,7 @@ def handle_client(conn, addr):
         while connected:
             msg = conn.recv(1024).decode(FORMAT)
             if not msg:
-                break
+                continue
             
             if msg == DISCONNECT_MESSAGE:
                 connected = False
@@ -59,13 +61,15 @@ def handle_client(conn, addr):
         
             # find receiver and message
             print(f"[{addr, username}] {msg}")
-            message = conn.recv(1024).decode(FORMAT)
-            receiverEnd = message.find(":")
-            receiver = message[:receiverEnd]
-            message = message[receiverEnd+1:]
 
+            receiverEnd = msg.find(":")
+            receiver = msg[:receiverEnd]
+            message = msg[receiverEnd+1:]
+
+            if receiver not in clients:
+                continue
             receiver_socket = clients[receiver]["client"]
-            receiver_socket.sendall(f"[{addr}] {msg}".encode(FORMAT))
+            receiver_socket.send(f"[{username}] ~:> {message}".encode(FORMAT))
 
     finally:
         # with clients_lock:
