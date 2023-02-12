@@ -82,7 +82,7 @@ def handle_register(client, payload):
             "messages": [],
             "unloaded_messages": []
         }
-        send(client, f"Successfully registered {username}!", SERVER_MESSAGE)
+        send(client, f"Successfully registered {username}!", REGISTER)
     except ValueError:
         return
     
@@ -105,7 +105,7 @@ def handle_login(client, payload):
         users[username]["logged_in"] = True
         # save client's current logged in username
         clients[client] = username
-        send(client, f"Successfully logged in {username}!", SERVER_MESSAGE)
+        send(client, f"Successfully logged in {username}!", LOGIN)
     except:
         return
     
@@ -174,6 +174,7 @@ def handle_client(conn, addr):
             # 4. message data
             message_data = conn.recv(message_length).decode(FORMAT)
 
+            # handle specific operation
             if operation == REGISTER:
                 handle_register(conn, message_data)
             elif operation == LOGIN:

@@ -62,54 +62,50 @@ def send(client, msg, operation_code):
     client.send(version + operation + header_length + message_length + message)
 
 
-
-# listens to messages on another thread while allowing user to send messages
-def send_to_server(client):
-
-    threading.Thread(target=listen_from_server, args=(client, )).start()
+# Continually listens to messages from server on another thread
+def listening_thread(client):
     while True:
-        message = input()
-        if message:
-            send(client, message, SEND)
+        listen_from_server(client)
 
 
-# a separate thread for listening to messages from server that are par the wired protocol
+# a separate thread for listening to messages from server that are par the wired protocol.
+# Returns True on success, False on failure
 def listen_from_server(client):
-    while True:
-        version = int.from_bytes(client.recv(p_sizes["ver"]), BYTE_ORDER)
-        if version != VERSION:
-            print(f"Server version {version} is not compatible with client version {VERSION}.")
-            # TODO: send message to server to disconnect it
-            return
-        # 2. operation code
-        operation = int.from_bytes(client.recv(p_sizes["op"]), BYTE_ORDER)
-        if operation not in defined_operations:
-            print(f"Operation {operation} not supported!")
-            # TODO: send message to client to disconnect it
-            return 
-        # TODO: not sure what to do with header_length
-        _header_length = int.from_bytes(client.recv(p_sizes["h_len"]), BYTE_ORDER)
-        # 3. message length
-        message_length = int.from_bytes(client.recv(p_sizes["m_len"]), BYTE_ORDER)
-        # 4. message data
-        message_data = client.recv(message_length).decode(FORMAT)
+    version = int.from_bytes(client.recv(p_sizes["ver"]), BYTE_ORDER)
+    if version != VERSION:
+        print(f"Server version {version} is not compatible with client version {VERSION}.")
+        # TODO: send message to server to disconnect it
+        return False
+    # 2. operation code
+    operation = int.from_bytes(client.recv(p_sizes["op"]), BYTE_ORDER)
+    if operation not in defined_operations:
+        print(f"Operation {operation} not supported!")
+        # TODO: send message to client to disconnect it
+        return False
+    # TODO: not sure what to do with header_length
+    _header_length = int.from_bytes(client.recv(p_sizes["h_len"]), BYTE_ORDER)
+    # 3. message length
+    message_length = int.from_bytes(client.recv(p_sizes["m_len"]), BYTE_ORDER)
+    # 4. message data
+    message_data = client.recv(message_length).decode(FORMAT)
 
-        # if receiving from another client, print out
-        if operation == RECEIVE:
-            username, content = message_data.split("~:>")
-            print(f"{username}> {content}")
-        # if receiving from server, print differently
-        elif operation == SERVER_MESSAGE:
-            print("[SERVER] " + message_data)
+    # if receiving from another client, print out
+    if operation == RECEIVE:
+        username, content = message_data.split("~:>")
+        print(f"{username}> {content}")
+        return True
+    # if receiving from server, print differently
+    elif operation == SERVER_MESSAGE:
+        print("[SERVER] " + message_data)
+        return False
+    # register op code == account registered/logged-in successfully
+    elif operation == REGISTER or operation == LOGIN:
+        print("[SERVER] " + message_data)
+        return True
 
 
-def start():
-    # returns client socket on success
-    client = connect()
-    if client is None:
-        return 
-    
-    # ask the user if they want to register or log in
+# prompts user to register an account
+def register_user(client):
     while True:
         register = input("Would you like to register for a new account? (yes/no) ")
         if register.lower() == 'yes':
@@ -127,20 +123,16 @@ def start():
             send(client, f"{username}~{password}", REGISTER)
 
             # wait for server response
-            registered = False
-            while not registered:
-                message = client.recv(1024).decode(FORMAT)
-                if message:
-                    print(message)
-                    if "Successfully" in message:
-                        registered = True
-                    print(registered)
-            if registered:
-                break
+            successful = False
+            while not successful:
+                successful = listen_from_server(client)
+            break
         elif register.lower() == 'no':
             break
 
-    # log in the user
+
+# prompts user to login
+def login_user(client):
     while True:
         login = input("Would you like to log in? (yes/no) ")
         if login.lower() == 'yes':
@@ -152,33 +144,31 @@ def start():
             password = input("Password: ")
             send(client, f"{username}~{password}", LOGIN)
 
-            loggedin = False
-            while not loggedin:
-                message = client.recv(1024).decode(FORMAT)
-                if message:
-                    print(message)
-                    if "Successfully" in message:
-                        loggedin = True
-            if loggedin:
-                break
+            loggedIn = False
+            while not loggedIn:
+                loggedIn = listen_from_server(client)
+            break
         elif login.lower() == 'no':
-            message = client.recv(1024).decode(FORMAT)
-            if message:
-                print(message)
-                break
-    print("CHECK POINT")
-    send_to_server(client)
-
-    # wait for server response
-    # while True:
-    #     msg = input("Message (q for quit): ")
-    #     if msg == 'q':
-    #         break
-    #     send(client, msg)
-
-    # send(client, DISCONNECT_MESSAGE)
-    # time.sleep(1)
-    # print('Disconnected from server.')
+            listen_from_server(client)
 
 
-start()
+def start():
+    # returns client socket on success
+    client = connect()
+    if client is None:
+        return 
+    
+    register_user(client)
+    login_user(client)
+
+    # start another listening thread for server messages
+    threading.Thread(target=listening_thread, args=(client, )).start()
+    # input thread for user messages
+    while True:
+        message = input()
+        if message:
+            send(client, message, SEND)
+
+
+if __name__ == "__main__":
+    start()
