@@ -64,11 +64,16 @@ def start():
                 continue
             send(client, f"register~{username}~{password}")
             # wait for server response
-            while True:
+            registered = False
+            while not registered:
                 message = client.recv(1024).decode(FORMAT)
                 if message:
                     print(message)
-                    break
+                    if "Successfully" in message:
+                        registered = True
+                    print(registered)
+            if registered:
+                break
         elif register.lower() == 'no':
             break
 
@@ -83,13 +88,20 @@ def start():
                 continue
             password = input("Password: ")
             send(client, f"login~{username}~{password}")
+            loggedin = False
+            while not loggedin:
+                message = client.recv(1024).decode(FORMAT)
+                if message:
+                    print(message)
+                    if "Successfully" in message:
+                        loggedin = True
+            if loggedin:
+                break
+        elif login.lower() == 'no':
             message = client.recv(1024).decode(FORMAT)
             if message:
                 print(message)
                 break
-        else:
-            continue
-
     print("CHECK POINT")
     communicate_to_server(client)
 
