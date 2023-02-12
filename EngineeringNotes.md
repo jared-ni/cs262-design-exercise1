@@ -9,3 +9,4 @@ Jared Ni, Bryan Han
 - Today I pondered on two different approach I can take to implement the client-to-client messaging functionality. If we were to do this in a singular command prompt, that means if I want a client to be both send and receive message, I must start a new thread for the new client and more threads within the new thread to receive messages from other clients. Or, I can start another client for every pair of clients that has the sole purpose of reading their mutual messages. Which approach is better? I don't yet know, but I will find out soon. 
 
 
+- For encoding the header components of the wired protocol, how do I calculate by bytes in Python? Or, can I simply separate each of the protocol components with a special symbol? 

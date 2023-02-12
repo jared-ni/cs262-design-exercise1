@@ -6,7 +6,27 @@ PORT = 11112
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = "utf-8"
-DISCONNECT_MESSAGE = "!*DISCONNECT*"
+BYTE_ORDER = "big"
+
+"""
+wired protocol definitions: 
+1. version (1 bytes)
+2. operation code (1 bytes)
+3. header length (1 byte)
+4. message length (2 bytes)
+4. message data (message length bytes)
+"""
+# 1. version
+VERSION = 1
+# 2. operation_codes
+REGISTER = 1
+LOGIN = 2
+LIST = 3
+DELETE = 4
+SEND = 5
+RECEIVE = 6
+DISCONNECT = 7
+defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, DISCONNECT])
 
 # 1. connect client to server
 def connect():
@@ -20,9 +40,19 @@ def connect():
     return client
 
 
-def send(client, msg):
+# send client message as per standards defined by the wired protocol
+def send(client, msg, operation_code):
+    # 1. version
+    version = VERSION.to_bytes(1, BYTE_ORDER)
+    # 2. operation code
+    operation = operation_code.to_bytes(1, BYTE_ORDER)
+    # 4. message data and message length
     message = msg.encode(FORMAT)
-    client.send(message)
+    message_length = len(message).to_bytes(2, BYTE_ORDER)
+    # 3. header length 
+    header_length = (1 + len(version) + len(operation) + len(message_length)).to_bytes(1, BYTE_ORDER)
+    # 5. send message
+    client.send(version + operation + header_length + message_length + message)
 
 
 # listens to messages on another thread while allowing user to send messages
@@ -32,7 +62,7 @@ def communicate_to_server(client):
     while True:
         message = input()
         if message:
-            send(client, message)
+            send(client, message, SEND)
 
 
 def listen_for_server_messages(client):
@@ -62,7 +92,12 @@ def start():
             if password != re_password:
                 print("Passwords do not match.")
                 continue
-            send(client, f"register~{username}~{password}")
+
+
+            send(client, f"register~{username}~{password}", REGISTER)
+
+
+
             # wait for server response
             registered = False
             while not registered:
@@ -87,7 +122,7 @@ def start():
                 print("Username cannot be empty.")
                 continue
             password = input("Password: ")
-            send(client, f"login~{username}~{password}")
+            send(client, f"login~{username}~{password}", LOGIN)
             loggedin = False
             while not loggedin:
                 message = client.recv(1024).decode(FORMAT)
