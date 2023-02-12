@@ -18,36 +18,41 @@ clients = {}
 clients_lock = threading.Lock()
 
 
+def handle_account(conn):
+    # registration (optional)
+    account = conn.recv(1024).decode(FORMAT)
+    if account:
+        reg_type, username, password = account.split("~")
+        if reg_type == "register":
+            if username in clients:
+                # if username already exists, send error message
+                conn.sendall("Username already exists!".encode(FORMAT))
+                return
+            # add new user to clients dictionary
+            clients[username] = {
+                "password": password.encode(FORMAT), 
+                "client": conn
+            }
+            conn.send(f"Successfully registered {username}!".encode(FORMAT))
+        elif reg_type == "login":
+            if username not in clients:
+                # if username doesn't exist, send error message
+                conn.sendall("Username does not exist!".encode(FORMAT))
+                return
+            if clients[username]["password"] != password.encode(FORMAT):
+                # if password is incorrect, send error message
+                conn.sendall("Incorrect password!".encode(FORMAT))
+                return
+            conn.send(f"Successfully logged in {username}!".encode(FORMAT))
+    return username
+
 # handle client in separate thread
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
 
     try: 
-        # registration (optional)
-        account = conn.recv(1024).decode(FORMAT)
-        if account:
-            reg_type, username, password = account.split("~")
-            if reg_type == "register":
-                if username in clients:
-                    # if username already exists, send error message
-                    conn.sendall("Username already exists!".encode(FORMAT))
-                    return
-                # add new user to clients dictionary
-                clients[username] = {
-                    "password": password.encode(FORMAT), 
-                    "client": conn
-                }
-                conn.send(f"Successfully registered {username}!".encode(FORMAT))
-            elif reg_type == "login":
-                if username not in clients:
-                    # if username doesn't exist, send error message
-                    conn.sendall("Username does not exist!".encode(FORMAT))
-                    return
-                if clients[username]["password"] != password.encode(FORMAT):
-                    # if password is incorrect, send error message
-                    conn.sendall("Incorrect password!".encode(FORMAT))
-                    return
-                conn.send(f"Successfully logged in {username}!".encode(FORMAT))
+        handle_account(conn)
+        username = handle_account(conn)
 
         connected = True
         while connected:

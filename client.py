@@ -98,11 +98,11 @@ def start():
             if loggedin:
                 break
         elif login.lower() == 'no':
-            break
-
-        else:
-            continue
-
+            message = client.recv(1024).decode(FORMAT)
+            if message:
+                print(message)
+                break
+    print("CHECK POINT")
     communicate_to_server(client)
 
     # wait for server response
