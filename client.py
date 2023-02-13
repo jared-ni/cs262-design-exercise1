@@ -193,11 +193,11 @@ def start():
     while True:
         message = input()
         if message:
-            if message == "LIST":
+            if message == "./list":
                 list_users(client, message, LIST)
-            elif message == "DELETE": 
+            elif message == "./delete": 
                 delete_user(client, message, DELETE)
-            elif message == "DISCONNECT":
+            elif message == "./disconnect":
                 disconnect_user(client, message, DISCONNECT)
             else:
                 send(client, message, SEND)
