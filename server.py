@@ -138,7 +138,10 @@ def handle_send(client, payload):
     # send message to receiver
     # TODO: what to do when receiver is not logged in?
     receiver_socket = users[receiver]["client"]
-    send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
+    if not users[receiver]["logged_in"]:
+        users[receiver]["unloaded_messages"].append(f"{clients[client]}~:>{message}")
+    else:
+        send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
 
     # except Exception as e:
     #     print(e)
@@ -175,7 +178,20 @@ def handle_delete(client, payload):
     else:
         users.pop(username)
         send(client, f"Successfully deleted user {username}", SERVER_MESSAGE)
+
+def handle_disconnect(client, payload):
+    print(f"handle_disconnect: {client}, {payload}")
     
+    if client not in clients:
+        print("!")
+        send(client, "You are not logged in!", SERVER_MESSAGE)
+        return
+
+    username = clients[client]
+    users[username]["client"] = None
+    users[username]["logged_in"] = False
+    send(client, f"Disconnected {username}", DISCONNECT)
+
 
 # handle client in separate thread
 def handle_client(conn, addr):
@@ -216,6 +232,9 @@ def handle_client(conn, addr):
                 handle_list(conn, message_data)
             elif operation == DELETE:
                 handle_delete(conn, message_data)
+            elif operation == DISCONNECT:
+                handle_disconnect(conn, message_data)
+                raise Exception
 
     finally:
         # TODO: What do we do when client disconnects?
