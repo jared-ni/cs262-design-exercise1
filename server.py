@@ -233,18 +233,18 @@ def handle_client(conn, addr):
             elif operation == DELETE:
                 handle_delete(conn, message_data)
             elif operation == DISCONNECT:
-                handle_disconnect(conn, message_data)
                 raise Exception
 
     finally:
         # TODO: What do we do when client disconnects?
         print(f"[{addr}] disconnected.")
-        # log client out
-        current_user = clients[conn]
-        users[current_user]["logged_in"] = False
-        # currently, user can only log in on a single device
-        users[current_user]['client'] = None
-        # remove client from clients dictionary
+        handle_disconnect(conn, message_data)
+        # # log client out
+        # current_user = clients[conn]
+        # users[current_user]["logged_in"] = False
+        # # currently, user can only log in on a single device
+        # users[current_user]['client'] = None
+        # # remove client from clients dictionary
         del clients[conn]
 
         send(conn, f"[CLIENT DISCONNECTED]", SERVER_MESSAGE)
