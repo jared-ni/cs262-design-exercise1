@@ -102,6 +102,10 @@ def listen_from_server(client):
     elif operation == REGISTER or operation == LOGIN:
         print("[SERVER] " + message_data)
         return True
+    elif operation == LIST:
+        print(message_data)
+        return True
+    # dont really need DELETE
 
 
 # prompts user to register an account
@@ -151,6 +155,23 @@ def login_user(client):
         elif login.lower() == 'no':
             listen_from_server(client)
 
+def list_users(client, msg, operation_code):
+    send(client, msg, operation_code)
+
+def delete_user(client, msg, operation_code):
+    while True:
+        delete = input("Are you sure you want to delete your account? (yes/no) ")
+        if delete.lower() == 'yes':
+            password = input("Enter your password: ")
+            send(client, password, DELETE)
+            deleted = False
+            while not deleted:
+                deleted = listen_from_server(client)
+            break
+        elif delete.lower() == 'no':
+            listen_from_server(client)
+
+
 
 def start():
     # returns client socket on success
@@ -167,7 +188,12 @@ def start():
     while True:
         message = input()
         if message:
-            send(client, message, SEND)
+            if message == "LIST":
+                list_users(client, message, LIST)
+            elif message == "DELETE": 
+                delete_user(client, message, DELETE)
+            else:
+                send(client, message, SEND)
 
 
 if __name__ == "__main__":

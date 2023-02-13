@@ -146,6 +146,37 @@ def handle_send(client, payload):
     #     return
 
 
+def handle_list(client, payload):
+    print(f"handle_list: {client}, {payload}")
+    
+    if client not in clients:
+        print("!")
+        send(client, "You are not logged in!", SERVER_MESSAGE)
+        return
+
+    # Lists all users in the users dict
+    send(client, f"List of users:", SERVER_MESSAGE)
+    for user in users:
+        send(client, f"{user}", LIST)
+
+
+def handle_delete(client, payload):
+    print(f"handle_delete: {client}, {payload}")
+    
+    if client not in clients:
+        print("!")
+        send(client, "You are not logged in!", SERVER_MESSAGE)
+        return
+
+    username = clients[client]
+    if users[username]["password"] != payload.encode(FORMAT):
+        send(client, "Incorrect password!", SERVER_MESSAGE)
+        return
+    else:
+        users.pop(username)
+        send(client, f"Successfully deleted user {username}", SERVER_MESSAGE)
+    
+
 # handle client in separate thread
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
@@ -181,6 +212,10 @@ def handle_client(conn, addr):
                 handle_login(conn, message_data)
             elif operation == SEND:
                 handle_send(conn, message_data)
+            elif operation == LIST:
+                handle_list(conn, message_data)
+            elif operation == DELETE:
+                handle_delete(conn, message_data)
 
     finally:
         # TODO: What do we do when client disconnects?
