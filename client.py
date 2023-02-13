@@ -64,8 +64,9 @@ def send(client, msg, operation_code):
 
 # Continually listens to messages from server on another thread
 def listening_thread(client):
-    while True:
-        listen_from_server(client)
+    connected = True
+    while connected:
+        connected = listen_from_server(client)
 
 
 # a separate thread for listening to messages from server that are par the wired protocol.
@@ -97,7 +98,7 @@ def listen_from_server(client):
     # if receiving from server, print differently
     elif operation == SERVER_MESSAGE:
         print("[SERVER] " + message_data)
-        return False
+        return True
     # register op code == account registered/logged-in successfully
     elif operation == REGISTER or operation == LOGIN:
         print("[SERVER] " + message_data)
@@ -105,7 +106,9 @@ def listen_from_server(client):
     elif operation == LIST:
         print(message_data)
         return True
-    # dont really need DELETE
+    elif operation == DISCONNECT:
+        print("[SERVER] " + message_data)
+        return False
 
 
 # prompts user to register an account
@@ -171,6 +174,8 @@ def delete_user(client, msg, operation_code):
         elif delete.lower() == 'no':
             listen_from_server(client)
 
+def disconnect_user(client, msg, operation_code):
+    send(client, msg, DISCONNECT)
 
 
 def start():
@@ -188,10 +193,12 @@ def start():
     while True:
         message = input()
         if message:
-            if message == "LIST":
+            if message == "./list":
                 list_users(client, message, LIST)
-            elif message == "DELETE": 
+            elif message == "./delete": 
                 delete_user(client, message, DELETE)
+            elif message == "./disconnect":
+                disconnect_user(client, message, DISCONNECT)
             else:
                 send(client, message, SEND)
 
