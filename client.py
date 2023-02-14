@@ -93,7 +93,7 @@ def listen_from_server(client):
     # if receiving from another client, print out
     if operation == RECEIVE:
         username, content = message_data.split("~:>")
-        print(f"{username}> {content}")
+        print(f"([{username}] {content})")
         return True
     # if receiving from server, print differently
     elif operation == SERVER_MESSAGE:
@@ -108,13 +108,14 @@ def listen_from_server(client):
         return True
     elif operation == DISCONNECT:
         print("[SERVER] " + message_data)
-        return False
+        return True
 
 
 # prompts user to register an account
 def register_user(client):
+    disconnect: False
     while True:
-        register = input("Would you like to register for a new account? (yes/no) ")
+        register = input("Would you like to register for a new account? (yes/no/disconnect) ")
         if register.lower() == 'yes':
             # register the user
             username = input("Username: ")
@@ -135,13 +136,22 @@ def register_user(client):
                 successful = listen_from_server(client)
             break
         elif register.lower() == 'no':
-            break
+            login_user(client)
+        elif register.lower() == 'disconnect':
+            disconnect_client(client, "disconnect", DISCONNECT)
 
+            successful = False
+            while not successful:
+                successful = listen_from_server(client)
+            disconnect = True
+            break
+    return disconnect
 
 # prompts user to login
 def login_user(client):
+    disconnect = False
     while True:
-        login = input("Would you like to log in? (yes/no) ")
+        login = input("Would you like to log in? (yes/no/disconnect) ")
         if login.lower() == 'yes':
             # log in the user
             username = input("Username: ")
@@ -156,7 +166,16 @@ def login_user(client):
                 loggedIn = listen_from_server(client)
             break
         elif login.lower() == 'no':
-            listen_from_server(client)
+            register_user(client)
+        elif login.lower() == 'disconnect':
+            disconnect_client(client, "disconnect", DISCONNECT)
+
+            successful = False
+            while not successful:
+                successful = listen_from_server(client)
+            disconnect = True
+            break
+    return disconnect
 
 def list_users(client, msg, operation_code):
     send(client, msg, operation_code)
@@ -174,8 +193,8 @@ def delete_user(client, msg, operation_code):
         elif delete.lower() == 'no':
             listen_from_server(client)
 
-def disconnect_user(client, msg, operation_code):
-    send(client, msg, DISCONNECT)
+def disconnect_client(client, msg, operation_code):
+    send(client, msg, operation_code)
 
 
 def start():
@@ -184,21 +203,26 @@ def start():
     if client is None:
         return 
     
-    register_user(client)
-    login_user(client)
+    if register_user(client):
+        return
+    if login_user(client):
+        return
 
     # start another listening thread for server messages
     threading.Thread(target=listening_thread, args=(client, )).start()
     # input thread for user messages
-    while True:
+    disconnected = False
+    while not disconnected:
         message = input()
         if message:
             if message == "./list":
                 list_users(client, message, LIST)
             elif message == "./delete": 
                 delete_user(client, message, DELETE)
+                register_user(client)
             elif message == "./disconnect":
-                disconnect_user(client, message, DISCONNECT)
+                disconnect_client(client, message, DISCONNECT)
+                disconnected = True
             else:
                 send(client, message, SEND)
 

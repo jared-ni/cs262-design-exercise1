@@ -176,21 +176,20 @@ def handle_delete(client, payload):
         send(client, "Incorrect password!", SERVER_MESSAGE)
         return
     else:
-        users.pop(username)
+        del users[username]
+        # users.pop(username)
         send(client, f"Successfully deleted user {username}", SERVER_MESSAGE)
 
 def handle_disconnect(client, payload):
     print(f"handle_disconnect: {client}, {payload}")
-    
-    if client not in clients:
-        print("!")
-        send(client, "You are not logged in!", SERVER_MESSAGE)
-        return
 
-    username = clients[client]
-    users[username]["client"] = None
-    users[username]["logged_in"] = False
-    send(client, f"Disconnected {username}", DISCONNECT)
+    if payload != "disconnect":
+        username = clients[client]
+        users[username]["client"] = None
+        users[username]["logged_in"] = False
+        del clients[client]
+
+    send(client, f"[CLIENT DISCONNECTED]", DISCONNECT)
 
 
 # handle client in separate thread
@@ -235,7 +234,7 @@ def handle_client(conn, addr):
             elif operation == DISCONNECT:
                 raise Exception
 
-    finally:
+    except:
         # TODO: What do we do when client disconnects?
         print(f"[{addr}] disconnected.")
         handle_disconnect(conn, message_data)
@@ -245,9 +244,8 @@ def handle_client(conn, addr):
         # # currently, user can only log in on a single device
         # users[current_user]['client'] = None
         # # remove client from clients dictionary
-        del clients[conn]
 
-        send(conn, f"[CLIENT DISCONNECTED]", SERVER_MESSAGE)
+        # send(conn, f"[CLIENT DISCONNECTED]", DISCONNECT)
         time.sleep(2)
         conn.close()
 
