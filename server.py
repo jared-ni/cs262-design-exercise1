@@ -89,6 +89,7 @@ def handle_register(client, payload):
 
 # handle account login
 def handle_login(client, payload):
+    print(f"handle_login: {client}, {payload}")
     if not payload:
         return 
     try:
@@ -103,8 +104,17 @@ def handle_login(client, payload):
             return
         # TODO: lock clients dictionary
         users[username]["logged_in"] = True
-        # save client's current logged in username
+
+        # if user was previously logged in, log them out
+        if client in clients:
+            prev_user = clients[client]
+            users[prev_user]["logged_in"] = False
+            users[prev_user]["client"] = None
+        # save client's current logged in username, and save client in users dictionary
         clients[client] = username
+        users[username]["logged_in"] = True
+        users[username]["client"] = client
+
         send(client, f"Successfully logged in {username}!", LOGIN)
     except:
         return
@@ -134,7 +144,7 @@ def handle_send(client, payload):
         send(client, f"User {receiver} does not exist!", SERVER_MESSAGE)
         return
 
-    print("message: " + receiver + str(receiverEnd) + message)
+    print("message: " + receiver + " " + message)
     # send message to receiver
     # TODO: what to do when receiver is not logged in?
     receiver_socket = users[receiver]["client"]
@@ -154,7 +164,7 @@ def handle_list(client, payload):
     print(f"handle_list: {client}, {payload}")
     
     # Lists all users in the users dict
-    send(client, f"List of users:", SERVER_MESSAGE)
+    send(client, f"List of users:", LIST)
     for user in users:
         send(client, f"{user}", LIST)
 
@@ -173,7 +183,6 @@ def handle_delete(client, payload):
         return
     else:
         del users[username]
-        # users.pop(username)
         send(client, f"Successfully deleted user {username}", SERVER_MESSAGE)
 
 
