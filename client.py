@@ -35,6 +35,8 @@ p_sizes = {
     "m_len": 2
 }
 
+logged_in = False
+
 # 1. connect client to server
 def connect():
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -100,13 +102,19 @@ def listen_from_server(client):
         print("[SERVER] " + message_data)
         return True
     # register op code == account registered/logged-in successfully
-    elif operation == REGISTER or operation == LOGIN:
+    elif operation == REGISTER:
         print("[SERVER] " + message_data)
+        return True
+    elif operation == LOGIN:
+        logged_in = True
+        print("[SERVER] " + message_data)
+        print("Commands: ./list, ./register, ./login, ./delete, ./disconnect, <user>: <message>. Type ./help for more info.")
         return True
     elif operation == LIST:
         print(message_data)
         return True
     elif operation == DISCONNECT:
+        logged_in = False
         print("[SERVER] " + message_data)
         return False
 
@@ -135,6 +143,7 @@ def register_user(client):
             send(client, "", DISCONNECT)
             return True
 
+
 # prompts user to login. Return whether user disconnected
 def login_user(client):
     while True:
@@ -149,6 +158,7 @@ def login_user(client):
             send(client, f"{username}~{password}", LOGIN)
             return False
         elif login.lower() == 'no':
+
             return False
         elif login.lower() == 'disconnect':
             send(client, "", DISCONNECT)
@@ -162,36 +172,41 @@ def list_users(client, msg, operation_code):
 
 # delete the current user. Return whether account is deleted
 def delete_user(client):
+    if not logged_in:
+        print("You are not logged in.")
+        return False
     while True:
         response = input("Are you sure you want to delete your account? (yes/no) ")
         if response.lower() == 'yes':
             password = input("Enter your password: ")
             send(client, password, DELETE)
-            time.sleep(1)
+            time.sleep(0.5)
             return True
         elif response.lower() == 'no':
             return False
 
 
 # delete the current user. Return whether account is deleted
-def delete_or_disconnect(client, is_delete, operation_code):
+def disconnect_client(client):
     while True:
-        if is_delete:
-            response = input("Are you sure you want to delete your account? (yes/no) ")
-        else:
-            response = input("Are you sure you want to disconnect? (yes/no) ")
-
+        response = input("Are you sure you want to disconnect? (yes/no) ")
         if response.lower() == 'yes':
-            if is_delete:
-                password = input("Enter your password: ")
-                send(client, password, DELETE)
-                time.sleep(1)
             send(client, "", DISCONNECT)
             return True
         elif response.lower() == 'no':
             return False
 
 
+def print_help():
+    print("Commands:")
+    print("\t./list: list all users,")
+    print("\t./register: register a new account,")
+    print("\t./login: log in to an existing account,")
+    print("\t./delete: delete your account,")
+    print("\t./disconnect: disconnect from the server,")
+    print("\t<user>: <message>: send a message to a user.")
+
+# main function
 def start():
     # returns client socket on success
     client = connect()
@@ -202,23 +217,33 @@ def start():
     threading.Thread(target=listening_thread, args=(client, )).start()
 
     register_user(client)
-    time.sleep(1)
+    time.sleep(0.5)
     login_user(client)
 
     # input thread for user messages
     disconnected = False
     while not disconnected:
-        message = input()
+        message = input().lower()
         if message:
             if message == "./help":
-                print("Commands: ./list, ./delete, ./disconnect, <user>: <message>")
+                print_help()
             elif message == "./list":
                 list_users(client, message, LIST)
+            elif message == "./register":
+                register_user(client)
+            elif message == "./login":
+                login_user(client)
             elif message == "./delete":
+                if not logged_in:
+                    print("You are not logged in.")
+                    continue
                 if delete_user(client):
                     register_user(client)
                     login_user(client)
             elif message == "./disconnect":
+                if not logged_in:
+                    print("You are not logged in.")
+                    continue
                 send(client, False, DISCONNECT)
             else:
                 send(client, message, SEND)

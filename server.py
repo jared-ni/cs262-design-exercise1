@@ -116,7 +116,7 @@ def handle_send(client, payload):
 
     if client not in clients:
         print("!")
-        send(client, "You are not logged in!", SERVER_MESSAGE)
+        send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
     if not payload:
         print("?")
