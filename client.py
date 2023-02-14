@@ -111,9 +111,8 @@ def listen_from_server(client):
         return False
 
 
-# prompts user to register an account
+# prompts user to register an account. Returns whether disconnected
 def register_user(client):
-    disconnect = False
     while True:
         register = input("Would you like to register for a new account? (yes/no/disconnect) ")
         if register.lower() == 'yes':
@@ -129,26 +128,15 @@ def register_user(client):
                 continue
             # TODO: Hash password
             send(client, f"{username}~{password}", REGISTER)
-
-            # wait for server response
-            successful = False
-            while not successful:
-                successful = listen_from_server(client)
-            break
+            return False
         elif register.lower() == 'no':
-            login_user(client)
-            break
+            return False
         elif register.lower() == 'disconnect':
             send(client, "", DISCONNECT)
-            successful = False
-            while not successful:
-                successful = listen_from_server(client)
-            disconnect = True
-    return disconnect
+            return True
 
-# prompts user to login
+# prompts user to login. Return whether user disconnected
 def login_user(client):
-    disconnect = False
     while True:
         login = input("Would you like to log in? (yes/no/disconnect) ")
         if login.lower() == 'yes':
@@ -159,22 +147,12 @@ def login_user(client):
                 continue
             password = input("Password: ")
             send(client, f"{username}~{password}", LOGIN)
-
-            loggedIn = False
-            while not loggedIn:
-                loggedIn = listen_from_server(client)
-            break
+            return False
         elif login.lower() == 'no':
-            register_user(client)
-            break
+            return False
         elif login.lower() == 'disconnect':
             send(client, "", DISCONNECT)
-            successful = False
-            while not successful:
-                successful = listen_from_server(client)
-            disconnect = True
-            break
-    return disconnect
+            return True
 
 
 # lists the current accounts on the server
@@ -183,18 +161,34 @@ def list_users(client, msg, operation_code):
 
 
 # delete the current user. Return whether account is deleted
-def delete_user(client, msg, operation_code):
+def delete_user(client):
     while True:
-        delete = input("Are you sure you want to delete your account? (yes/no) ")
-        if delete.lower() == 'yes':
+        response = input("Are you sure you want to delete your account? (yes/no) ")
+        if response.lower() == 'yes':
             password = input("Enter your password: ")
             send(client, password, DELETE)
             time.sleep(1)
-            send(client, "", DISCONNECT)
-            time.sleep(1)
             return True
-        elif delete.lower() == 'no':
-            deleted = False
+        elif response.lower() == 'no':
+            return False
+
+
+# delete the current user. Return whether account is deleted
+def delete_or_disconnect(client, is_delete, operation_code):
+    while True:
+        if is_delete:
+            response = input("Are you sure you want to delete your account? (yes/no) ")
+        else:
+            response = input("Are you sure you want to disconnect? (yes/no) ")
+
+        if response.lower() == 'yes':
+            if is_delete:
+                password = input("Enter your password: ")
+                send(client, password, DELETE)
+                time.sleep(1)
+            send(client, "", DISCONNECT)
+            return True
+        elif response.lower() == 'no':
             return False
 
 
@@ -204,24 +198,28 @@ def start():
     if client is None:
         return 
     
-    if register_user(client):
-        return
-    if login_user(client):
-        return
-
     # start another listening thread for server messages
     threading.Thread(target=listening_thread, args=(client, )).start()
+
+    register_user(client)
+    time.sleep(1)
+    login_user(client)
+
     # input thread for user messages
     disconnected = False
     while not disconnected:
         message = input()
         if message:
-            if message == "./list":
+            if message == "./help":
+                print("Commands: ./list, ./delete, ./disconnect, <user>: <message>")
+            elif message == "./list":
                 list_users(client, message, LIST)
-            elif message == "./delete": 
-                delete_user(client, message, DELETE)
+            elif message == "./delete":
+                if delete_user(client):
+                    register_user(client)
+                    login_user(client)
             elif message == "./disconnect":
-                send(client, "", DISCONNECT)
+                send(client, False, DISCONNECT)
             else:
                 send(client, message, SEND)
 

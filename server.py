@@ -127,7 +127,7 @@ def handle_send(client, payload):
     receiverEnd = payload.find(":")
     message = payload[receiverEnd+1:]
     if receiverEnd == -1 or not message:
-        send(client, "Syntax for sending a message to a user: <username>: <message>", SERVER_MESSAGE)
+        send(client, "Syntax for sending a message to a user: <username>: <message>. Type ./help for additional commands.", SERVER_MESSAGE)
         return
     receiver = payload[:receiverEnd]
     if receiver not in users:
@@ -149,26 +149,22 @@ def handle_send(client, payload):
     #     return
 
 
+# print out all users registered
 def handle_list(client, payload):
     print(f"handle_list: {client}, {payload}")
     
-    if client not in clients:
-        print("!")
-        send(client, "You are not logged in!", SERVER_MESSAGE)
-        return
-
     # Lists all users in the users dict
     send(client, f"List of users:", SERVER_MESSAGE)
     for user in users:
         send(client, f"{user}", LIST)
 
 
+# delete current user's account
 def handle_delete(client, payload):
     print(f"handle_delete: {client}, {payload}")
     
     if client not in clients:
-        print("!")
-        send(client, "You are not logged in!", SERVER_MESSAGE)
+        send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
 
     username = clients[client]
@@ -181,7 +177,12 @@ def handle_delete(client, payload):
         send(client, f"Successfully deleted user {username}", SERVER_MESSAGE)
 
 
+# handle disconnect
 def handle_disconnect(client):
+    if client not in clients:
+        send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
+        return
+    
     username = clients[client]
     # TODO: make user handle multiple client logins
     if username and username in users:
@@ -190,7 +191,6 @@ def handle_disconnect(client):
         del clients[client]
 
     send(client, "[CLIENT DISCONNECTED]", DISCONNECT)
-
     time.sleep(2)
     client.close()
 

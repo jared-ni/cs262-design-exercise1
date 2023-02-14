@@ -31,3 +31,6 @@ My thoughts on client side structure:
 
 
 - NEED A RESPONSE MESSAGE, IN CASE MESSAGE NOT DELIVERED. 
+
+
+- Fixed a huge design flaw. The listening thread and the input threads are not supposed to interact, so it doesn't matter what the results of functions are. We simply send the message, and if they fail, we throw fail message on the listening thread. It's okay if they fail, because the client can simply call them again. It doesn't have to repeatedly ask the server for response when creating a new account, because we can simply call the register_user function on demand. Every loop, we check whether the user is logged in, and if they are not, we ask them to sign in, and if they refuse, we deny them any user-level commands like sending messages. 
