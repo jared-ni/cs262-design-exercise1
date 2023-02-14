@@ -1,6 +1,7 @@
 import threading
 import socket
 import time
+import bcrypt
 
 PORT = 48789
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -63,6 +64,16 @@ def send(client, msg, operation_code):
     client.send(version + operation + header_length + message_length + message)
 
 
+# hash password again for storage
+def hash_password(password):
+    return bcrypt.hashpw(password.encode(FORMAT), bcrypt.gensalt())
+
+# return true if password matches hashed password
+def check_password(password, hashed_password):
+    # print(hashed_password)
+    return bcrypt.checkpw(password.encode(FORMAT), hashed_password)
+
+
 # handle account registration and login
 def handle_register(client, payload):
     if not payload:
@@ -76,7 +87,7 @@ def handle_register(client, payload):
         # add new user to clients dictionary
         users[username] = {
             # TODO: hash password
-            "password": password.encode(FORMAT), 
+            "password": hash_password(password),
             "client": client,
             "logged_in": False,
             "messages": [],
@@ -99,12 +110,12 @@ def handle_login(client, payload):
             send(client, "Username does not exist!", SERVER_MESSAGE)
             return
         # TODO: hash password
-        if users[username]["password"] != password.encode(FORMAT):
+        if not check_password(password, users[username]["password"]):
             send(client, "Incorrect password!", SERVER_MESSAGE)
             return
+        
         # TODO: lock clients dictionary
         users[username]["logged_in"] = True
-
         # if user was previously logged in, log them out
         if client in clients:
             prev_user = clients[client]
@@ -178,7 +189,7 @@ def handle_delete(client, payload):
         return
 
     username = clients[client]
-    if users[username]["password"] != payload.encode(FORMAT):
+    if not check_password(payload, users[username]["password"]):
         send(client, "Incorrect password!", SERVER_MESSAGE)
         return
     else:

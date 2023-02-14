@@ -1,6 +1,7 @@
 import threading
 import socket
 import time
+from hashlib import blake2b
 
 PORT = 48789
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -34,6 +35,7 @@ p_sizes = {
     "h_len": 1,
     "m_len": 2
 }
+CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
 
 logged_in = [False]
 
@@ -125,6 +127,13 @@ def listen_from_server(client, logged_in):
         return False
 
 
+# get hashed password
+def get_hashed_password(password):
+    h = blake2b(key=CLIENT_KEY, digest_size=16)
+    h.update(password.encode(FORMAT))
+    return h.hexdigest()
+
+
 # prompts user to register an account. Returns whether disconnected
 def register_user(client):
     while True:
@@ -136,11 +145,13 @@ def register_user(client):
                 print("Username cannot be empty.")
                 continue
             password = input("Password: ")
+
             re_password = input("Re-enter password: ")
             if password != re_password:
                 print("Passwords do not match.")
                 continue
             # TODO: Hash password
+            password = get_hashed_password(password)
             send(client, f"{username}~{password}", REGISTER)
             return False
         elif register.lower() == 'no':
@@ -162,6 +173,7 @@ def login_user(client):
                 print("Username cannot be empty.")
                 continue
             password = input("Password: ")
+            password = get_hashed_password(password)
             send(client, f"{username}~{password}", LOGIN)
             return False
         elif login.lower() == 'no':
@@ -186,6 +198,7 @@ def delete_user(client):
         response = input("Are you sure you want to delete your account? (yes/no) ")
         if response.lower() == 'yes':
             password = input("Enter your password: ")
+            password = get_hashed_password(password)
             send(client, password, DELETE)
             time.sleep(0.5)
             logged_in[0] = False
