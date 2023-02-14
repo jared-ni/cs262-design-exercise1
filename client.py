@@ -113,7 +113,7 @@ def listen_from_server(client):
 
 # prompts user to register an account
 def register_user(client):
-    disconnect: False
+    disconnect = False
     while True:
         register = input("Would you like to register for a new account? (yes/no/disconnect) ")
         if register.lower() == 'yes':
