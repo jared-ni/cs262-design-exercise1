@@ -28,3 +28,6 @@ How should I abstract the code for registering and logging in? Should they be pa
 My thoughts on client side structure: 
     - After connecting, asks user whether they want to register. Then, ask them to log in. Whenever they want to register or login another account, they may do so with commands. 
     - After register/login, user enters while loop, where it follows the structure for server side socket.
+
+
+- NEED A RESPONSE MESSAGE, IN CASE MESSAGE NOT DELIVERED. 
