@@ -2,7 +2,7 @@ import threading
 import socket
 import time
 
-PORT = 11112
+PORT = 48789
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = "utf-8"
@@ -137,14 +137,13 @@ def register_user(client):
             break
         elif register.lower() == 'no':
             login_user(client)
+            break
         elif register.lower() == 'disconnect':
             disconnect_client(client, "disconnect", DISCONNECT)
-
             successful = False
             while not successful:
                 successful = listen_from_server(client)
             disconnect = True
-            break
     return disconnect
 
 # prompts user to login
@@ -167,9 +166,9 @@ def login_user(client):
             break
         elif login.lower() == 'no':
             register_user(client)
+            break
         elif login.lower() == 'disconnect':
             disconnect_client(client, "disconnect", DISCONNECT)
-
             successful = False
             while not successful:
                 successful = listen_from_server(client)
@@ -181,6 +180,7 @@ def list_users(client, msg, operation_code):
     send(client, msg, operation_code)
 
 def delete_user(client, msg, operation_code):
+    deleted = True
     while True:
         delete = input("Are you sure you want to delete your account? (yes/no) ")
         if delete.lower() == 'yes':
@@ -188,10 +188,13 @@ def delete_user(client, msg, operation_code):
             send(client, password, DELETE)
             deleted = False
             while not deleted:
+                time.sleep(5)
                 deleted = listen_from_server(client)
             break
         elif delete.lower() == 'no':
-            listen_from_server(client)
+            deleted = False
+            break
+    return deleted
 
 def disconnect_client(client, msg, operation_code):
     send(client, msg, operation_code)
@@ -218,8 +221,12 @@ def start():
             if message == "./list":
                 list_users(client, message, LIST)
             elif message == "./delete": 
-                delete_user(client, message, DELETE)
-                register_user(client)
+                deleted = delete_user(client, message, DELETE)
+                # disconnect_client(client, message, DISCONNECT)
+                # disconnected = True
+                if deleted:
+                    register_user(client)
+                    # disconnect_client(client, message, DISCONNECT)
             elif message == "./disconnect":
                 disconnect_client(client, message, DISCONNECT)
                 disconnected = True

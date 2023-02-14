@@ -2,7 +2,7 @@ import threading
 import socket
 import time
 
-PORT = 11112
+PORT = 48789
 SERVER = socket.gethostbyname(socket.gethostname())
 ADDR = (SERVER, PORT)
 FORMAT = "utf-8"
@@ -189,7 +189,7 @@ def handle_disconnect(client, payload):
         users[username]["logged_in"] = False
         del clients[client]
 
-    send(client, f"[CLIENT DISCONNECTED]", DISCONNECT)
+    send(client, "[CLIENT DISCONNECTED]", DISCONNECT)
 
 
 # handle client in separate thread
