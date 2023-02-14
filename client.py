@@ -108,7 +108,7 @@ def listen_from_server(client):
         return True
     elif operation == DISCONNECT:
         print("[SERVER] " + message_data)
-        return True
+        return False
 
 
 # prompts user to register an account
@@ -139,7 +139,7 @@ def register_user(client):
             login_user(client)
             break
         elif register.lower() == 'disconnect':
-            disconnect_client(client, "disconnect", DISCONNECT)
+            send(client, "", DISCONNECT)
             successful = False
             while not successful:
                 successful = listen_from_server(client)
@@ -168,7 +168,7 @@ def login_user(client):
             register_user(client)
             break
         elif login.lower() == 'disconnect':
-            disconnect_client(client, "disconnect", DISCONNECT)
+            send(client, "", DISCONNECT)
             successful = False
             while not successful:
                 successful = listen_from_server(client)
@@ -176,28 +176,26 @@ def login_user(client):
             break
     return disconnect
 
+
+# lists the current accounts on the server
 def list_users(client, msg, operation_code):
     send(client, msg, operation_code)
 
+
+# delete the current user. Return whether account is deleted
 def delete_user(client, msg, operation_code):
-    deleted = True
     while True:
         delete = input("Are you sure you want to delete your account? (yes/no) ")
         if delete.lower() == 'yes':
             password = input("Enter your password: ")
             send(client, password, DELETE)
-            deleted = False
-            while not deleted:
-                time.sleep(5)
-                deleted = listen_from_server(client)
-            break
+            time.sleep(1)
+            send(client, "", DISCONNECT)
+            time.sleep(1)
+            return True
         elif delete.lower() == 'no':
             deleted = False
-            break
-    return deleted
-
-def disconnect_client(client, msg, operation_code):
-    send(client, msg, operation_code)
+            return False
 
 
 def start():
@@ -221,15 +219,9 @@ def start():
             if message == "./list":
                 list_users(client, message, LIST)
             elif message == "./delete": 
-                deleted = delete_user(client, message, DELETE)
-                # disconnect_client(client, message, DISCONNECT)
-                # disconnected = True
-                if deleted:
-                    register_user(client)
-                    # disconnect_client(client, message, DISCONNECT)
+                delete_user(client, message, DELETE)
             elif message == "./disconnect":
-                disconnect_client(client, message, DISCONNECT)
-                disconnected = True
+                send(client, "", DISCONNECT)
             else:
                 send(client, message, SEND)
 

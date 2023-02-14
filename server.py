@@ -180,16 +180,19 @@ def handle_delete(client, payload):
         # users.pop(username)
         send(client, f"Successfully deleted user {username}", SERVER_MESSAGE)
 
-def handle_disconnect(client, payload):
-    print(f"handle_disconnect: {client}, {payload}")
 
-    if payload != "disconnect":
-        username = clients[client]
+def handle_disconnect(client):
+    username = clients[client]
+    # TODO: make user handle multiple client logins
+    if username and username in users:
         users[username]["client"] = None
         users[username]["logged_in"] = False
         del clients[client]
 
     send(client, "[CLIENT DISCONNECTED]", DISCONNECT)
+
+    time.sleep(2)
+    client.close()
 
 
 # handle client in separate thread
@@ -237,18 +240,7 @@ def handle_client(conn, addr):
     except:
         # TODO: What do we do when client disconnects?
         print(f"[{addr}] disconnected.")
-        handle_disconnect(conn, message_data)
-        # # log client out
-        # current_user = clients[conn]
-        # users[current_user]["logged_in"] = False
-        # # currently, user can only log in on a single device
-        # users[current_user]['client'] = None
-        # # remove client from clients dictionary
-
-        # send(conn, f"[CLIENT DISCONNECTED]", DISCONNECT)
-        time.sleep(2)
-        conn.close()
-
+        handle_disconnect(conn)
 
 
 # handle clients
