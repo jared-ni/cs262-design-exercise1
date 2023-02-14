@@ -183,7 +183,7 @@ def handle_delete(client, payload):
         return
     else:
         del users[username]
-        send(client, f"Successfully deleted user {username}", SERVER_MESSAGE)
+        send(client, f"Successfully deleted user {username}", DELETE)
 
 
 # handle disconnect

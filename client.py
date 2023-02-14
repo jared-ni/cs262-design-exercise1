@@ -70,7 +70,6 @@ def listening_thread(client):
     connected = True
     while connected:
         connected = listen_from_server(client, logged_in)
-        print("logged in: " + str(logged_in[0]))
 
 
 # a separate thread for listening to messages from server that are par the wired protocol.
@@ -112,6 +111,10 @@ def listen_from_server(client, logged_in):
         logged_in[0] = True
         print("[SERVER] " + message_data)
         print_commands()
+        return True
+    elif operation == DELETE:
+        logged_in[0] = False
+        print("[SERVER] " + message_data)
         return True
     elif operation == LIST:
         print(message_data)
@@ -185,6 +188,7 @@ def delete_user(client):
             password = input("Enter your password: ")
             send(client, password, DELETE)
             time.sleep(0.5)
+            logged_in[0] = False
             return True
         elif response.lower() == 'no':
             print_commands()
