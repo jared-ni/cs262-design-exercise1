@@ -80,7 +80,8 @@ def listening_thread(client):
 def listen_from_server(client, logged_in):
     version = int.from_bytes(client.recv(p_sizes["ver"]), BYTE_ORDER)
     if version != VERSION:
-        print(f"Server version {version} is not compatible with client version {VERSION}.")
+        print(f"Server/Client connection might be lost,\
+               or server version {version} is not compatible with client version {VERSION}.")
         # TODO: send message to server to disconnect it
         return False
     # 2. operation code
@@ -178,11 +179,6 @@ def login_user(client):
             return False
 
 
-# lists the current accounts on the server
-def list_users(client, msg, operation_code):
-    send(client, msg, operation_code)
-
-
 # delete the current user. Return whether account is deleted
 def delete_user(client):
     if not logged_in[0]:
@@ -253,9 +249,10 @@ def start():
         if message:
             if message == "./help":
                 print_help()
-            elif message == "./list":
+            elif message[:6] == "./list":
                 # TODO: MAGIC WORD
-                list_users(client, "*", LIST)
+                magic_word = message[7:].strip().lower()
+                send(client, magic_word, LIST)
             elif message == "./register":
                 successful = register_user(client)
                 time.sleep(0.5)

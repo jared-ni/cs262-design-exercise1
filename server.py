@@ -199,10 +199,22 @@ def handle_unread(client):
 def handle_list(client, payload):
     print(f"handle_list: {client}, {payload}")
     
-    # Lists all users in the users dict
-    send(client, f"List of users:", LIST)
-    for user in users:
-        send(client, f"{user}", LIST)
+    if not payload or payload == "*":
+        # Lists all users in the users dict
+        send(client, f"List of users:", LIST)
+        for user in users:
+            send(client, f"{user}", LIST)
+    else:
+        # Lists all users in the users dict that contain the payload
+        send(client, f"List of users that contain {payload}:", LIST)
+        magic_word_size = len(payload)
+        for user in users:
+            # continue if username is too short
+            if magic_word_size > len(user):
+                continue
+            
+            if payload in user:
+                send(client, f"{user}", LIST)
 
 
 # delete current user's account
