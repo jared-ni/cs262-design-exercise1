@@ -41,3 +41,4 @@ My thoughts on client side structure:
 - locking all dictionaries with mutex
 - Add constraints to username (can't contain :)
 - Added better error messages
+- Do we want a Trie in order to make text wildcard efficient when searching for user accounts? 
