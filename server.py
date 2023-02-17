@@ -47,6 +47,7 @@ server.bind(ADDR)
 
 # dictionary for storing user information
 users = {}
+users_lock = threading.Lock()
 # dictionary for storing clients. maps socket to user
 clients = {}
 clients_lock = threading.Lock()
@@ -88,14 +89,15 @@ def handle_register(client, payload):
             send(client, "Username already exists!", SERVER_MESSAGE)
             return
         # add new user to clients dictionary
-        users[username] = {
-            # TODO: hash password
-            "password": hash_password(password),
-            "client": client,
-            "logged_in": False,
-            "messages": [],
-            "unread": deque()
-        }
+        with users_lock:
+            users[username] = {
+                # TODO: hash password
+                "password": hash_password(password),
+                "client": client,
+                "logged_in": False,
+                "messages": [],
+                "unread": deque()
+            }
         send(client, f"Successfully registered {username}!", REGISTER)
     except ValueError:
         return
@@ -118,16 +120,20 @@ def handle_login(client, payload):
             return
         
         # TODO: lock clients dictionary
-        users[username]["logged_in"] = True
+        with users_lock:
+            users[username]["logged_in"] = True
         # if user was previously logged in, log them out
-        if client in clients:
-            prev_user = clients[client]
-            users[prev_user]["logged_in"] = False
-            users[prev_user]["client"] = None
-        # save client's current logged in username, and save client in users dictionary
-        clients[client] = username
-        users[username]["logged_in"] = True
-        users[username]["client"] = client
+        with clients_lock:
+            if client in clients:
+                prev_user = clients[client]
+                with users_lock:
+                    users[prev_user]["logged_in"] = False
+                    users[prev_user]["client"] = None
+            # save client's current logged in username, and save client in users dictionary
+            clients[client] = username
+            with users_lock:
+                users[username]["logged_in"] = True
+                users[username]["client"] = client
 
         send(client, f"Successfully logged in {username}!", LOGIN)
     except:
@@ -159,11 +165,12 @@ def handle_send(client, payload):
     print("message: " + receiver + " " + message)
     # send message to receiver
     # TODO: what to do when receiver is not logged in?
-    receiver_socket = users[receiver]["client"]
-    if not users[receiver]["logged_in"]:
-        users[receiver]["unread"].appendleft(f"{clients[client]}~:>{message}")
-    else:
-        send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
+    with users_lock:
+        receiver_socket = users[receiver]["client"]
+        if not users[receiver]["logged_in"]:
+            users[receiver]["unread"].appendleft(f"{clients[client]}~:>{message}")
+        else:
+            send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
 
     # except Exception as e:
     #     print(e)
@@ -179,11 +186,11 @@ def handle_unread(client):
         return
     # get unread messages from user account
     username = clients[client]
-    unread_messages = users[username]["unread"]
     # send unread messages to client
-    while unread_messages:
-        message = unread_messages.pop()
-        send(client, message, RECEIVE)
+    with users_lock:
+        while users[username]["unread"]:
+            message = users[username]["unread"].pop()
+            send(client, message, RECEIVE)
     return True
 
 
@@ -211,7 +218,8 @@ def handle_delete(client, payload):
         send(client, "Incorrect password!", SERVER_MESSAGE)
         return
     else:
-        del users[username]
+        with users_lock:
+            del users[username]
         send(client, f"Successfully deleted user {username}", DELETE)
 
 
@@ -223,10 +231,11 @@ def handle_disconnect(client):
     
     username = clients[client]
     # TODO: make user handle multiple client logins
-    if username and username in users:
-        users[username]["client"] = None
-        users[username]["logged_in"] = False
-        del clients[client]
+    with users_lock:
+        if username and username in users:
+            users[username]["client"] = None
+            users[username]["logged_in"] = False
+            del clients[client]
 
     send(client, "[CLIENT DISCONNECTED]", DISCONNECT)
     time.sleep(2)
