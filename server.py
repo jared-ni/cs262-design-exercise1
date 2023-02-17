@@ -2,6 +2,7 @@ import threading
 import socket
 import time
 import bcrypt
+from collections import deque
 
 PORT = 48789
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -27,8 +28,10 @@ DELETE = 4
 SEND = 5
 RECEIVE = 6
 SERVER_MESSAGE = 7
-DISCONNECT = 8
-defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, DISCONNECT])
+UNREAD = 8
+DISCONNECT = 9
+defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, 
+                          SERVER_MESSAGE, UNREAD, DISCONNECT])
 p_sizes = {
     "ver": 1,
     "op": 1,
@@ -91,7 +94,7 @@ def handle_register(client, payload):
             "client": client,
             "logged_in": False,
             "messages": [],
-            "unloaded_messages": []
+            "unread": deque()
         }
         send(client, f"Successfully registered {username}!", REGISTER)
     except ValueError:
@@ -136,11 +139,9 @@ def handle_send(client, payload):
     print(f"handle_send: {client}, {payload}")
 
     if client not in clients:
-        print("!")
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
     if not payload:
-        print("?")
         return
     
     # try:
@@ -160,7 +161,7 @@ def handle_send(client, payload):
     # TODO: what to do when receiver is not logged in?
     receiver_socket = users[receiver]["client"]
     if not users[receiver]["logged_in"]:
-        users[receiver]["unloaded_messages"].append(f"{clients[client]}~:>{message}")
+        users[receiver]["unread"].appendleft(f"{clients[client]}~:>{message}")
     else:
         send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
 
@@ -168,6 +169,23 @@ def handle_send(client, payload):
     #     print(e)
     #     client.send(f"Error: {e} on line {e.args}".encode(FORMAT))
     #     return
+
+
+# handles unread messages by sending them to the client
+def handle_unread(client):
+    # check if user is logged in
+    if client not in clients:
+        send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
+        return
+    # get unread messages from user account
+    username = clients[client]
+    unread_messages = users[username]["unread"]
+    # send unread messages to client
+    while unread_messages:
+        message = unread_messages.pop()
+        send(client, message, RECEIVE)
+    return True
+
 
 
 # print out all users registered
@@ -254,6 +272,8 @@ def handle_client(conn, addr):
                 handle_list(conn, message_data)
             elif operation == DELETE:
                 handle_delete(conn, message_data)
+            elif operation == UNREAD:
+                handle_unread(conn)
             elif operation == DISCONNECT:
                 raise Exception
 

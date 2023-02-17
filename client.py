@@ -27,8 +27,9 @@ DELETE = 4
 SEND = 5
 RECEIVE = 6
 SERVER_MESSAGE = 7
-DISCONNECT = 8
-defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, DISCONNECT])
+UNREAD = 8
+DISCONNECT = 9
+defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, UNREAD, DISCONNECT])
 p_sizes = {
     "ver": 1,
     "op": 1,
@@ -103,7 +104,6 @@ def listen_from_server(client, logged_in):
     # if receiving from server, print differently
     elif operation == SERVER_MESSAGE:
         print("[SERVER] " + message_data)
-        print_commands()
         return True
     # register op code == account registered/logged-in successfully
     elif operation == REGISTER:
@@ -134,10 +134,10 @@ def get_hashed_password(password):
     return h.hexdigest()
 
 
-# prompts user to register an account. Returns whether disconnected
+# prompts user to register an account. Returns whether successful
 def register_user(client):
     while True:
-        register = input("Would you like to register for a new account? (yes/no/disconnect) ")
+        register = input("Would you like to register for a new account? (yes/no) ")
         if register.lower() == 'yes':
             # register the user
             username = input("Username: ")
@@ -153,19 +153,16 @@ def register_user(client):
             # TODO: Hash password
             password = get_hashed_password(password)
             send(client, f"{username}~{password}", REGISTER)
-            return False
+            return True
         elif register.lower() == 'no':
             print_commands()
             return False
-        elif register.lower() == 'disconnect':
-            send(client, "", DISCONNECT)
-            return True
 
 
-# prompts user to login. Return whether user disconnected
+# prompts user to login. Return whether successful
 def login_user(client):
     while True:
-        login = input("Would you like to log in? (yes/no/disconnect) ")
+        login = input("Would you like to log in? (yes/no) ")
         if login.lower() == 'yes':
             # log in the user
             username = input("Username: ")
@@ -175,13 +172,10 @@ def login_user(client):
             password = input("Password: ")
             password = get_hashed_password(password)
             send(client, f"{username}~{password}", LOGIN)
-            return False
+            return True
         elif login.lower() == 'no':
             print_commands()
             return False
-        elif login.lower() == 'disconnect':
-            send(client, "", DISCONNECT)
-            return True
 
 
 # lists the current accounts on the server
@@ -231,7 +225,7 @@ def print_help():
     print("\t<user>: <message>: send a message to a user.")
 
 def print_commands():
-    print("Commands: ./list, ./register, ./login, ./delete, ./disconnect, <user>: <message>. Type ./help for more info.")
+    print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./disconnect. Type ./help for more info.")
 
 
 # main function
@@ -247,7 +241,10 @@ def start():
 
     register_user(client)
     time.sleep(0.5)
-    login_user(client)
+    successful = login_user(client)
+    # deliver message whenever user first logs in
+    if successful:
+        send(client, "", UNREAD)
 
     # input thread for user messages
     disconnected = False
@@ -260,12 +257,16 @@ def start():
                 # TODO: MAGIC WORD
                 list_users(client, "*", LIST)
             elif message == "./register":
-                register_user(client)
+                successful = register_user(client)
                 time.sleep(0.5)
-                if not logged_in[0]:
+                if not successful:
+                    register_user(client)
+                elif not logged_in[0] and successful:
                     login_user(client)
             elif message == "./login":
                 login_user(client)
+                if successful:
+                    send(client, "", UNREAD)
             elif message == "./delete":
                 if not logged_in[0]:
                     print("You are not logged in.")
@@ -278,6 +279,7 @@ def start():
                     print("You are not logged in.")
                     continue
                 send(client, "", DISCONNECT)
+                break
             else:
                 send(client, message, SEND)
 
