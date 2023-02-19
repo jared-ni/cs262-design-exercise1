@@ -4,6 +4,7 @@ import time
 from hashlib import blake2b
 from sys import exit 
 import signal
+import errno
 
 PORT = 48789
 SERVER = socket.gethostbyname(socket.gethostname())
@@ -67,19 +68,35 @@ def send(client, msg, operation_code):
     # 3. header length 
     header_length = (1 + len(version) + len(operation) + len(message_length)).to_bytes(1, BYTE_ORDER)
     # 5. send message
-    client.send(version + operation + header_length + message_length + message)
-
+    try:
+        client.send(version + operation + header_length + message_length + message)
+    except BrokenPipeError:
+        print("Connection to server lost.")
+        logged_in[0] = False
+        forced_disconnect(client)
+    except IOError as e:
+        # recoverable EAGAIN and EWOULDBLOCK error: try again
+        if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
+            send(client, msg, operation_code)
+        print('Sending error', str(e))
+        forced_disconnect(client)
 
 # Continually listens to messages from server on another thread
 def listening_thread(client):
     connected = True
-    try: 
-        while connected:
+    while connected:
+        try: 
             connected = listen_from_server(client, logged_in)
-    except ConnectionAbortedError or KeyboardInterrupt:
-        print("Connection to server lost.")
-        logged_in[0] = False
-        forced_disconnect(client)
+        except ConnectionAbortedError or KeyboardInterrupt:
+            print("Connection to server lost.")
+            logged_in[0] = False
+            forced_disconnect(client)
+        except IOError as e:
+            # ignore recoverable EAGAIN and EWOULDBLOCK error
+            if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
+                continue
+            print('Reading error', str(e))
+            forced_disconnect(client)
 
 
 # a separate thread for listening to messages from server that are par the wired protocol.
