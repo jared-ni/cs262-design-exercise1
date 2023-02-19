@@ -124,7 +124,7 @@ def handle_login(client, payload):
             users[username]["logged_in"] = True
         # if user was previously logged in, log them out
         with clients_lock:
-            if client in clients:
+            if client in clients and clients[client] is not None:
                 prev_user = clients[client]
                 with users_lock:
                     users[prev_user]["logged_in"] = False
@@ -181,7 +181,7 @@ def handle_send(client, payload):
 # handles unread messages by sending them to the client
 def handle_unread(client):
     # check if user is logged in
-    if client not in clients:
+    if client not in clients or clients[client] is None:
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
     # get unread messages from user account
@@ -250,14 +250,13 @@ def handle_disconnect(client):
             del clients[client]
 
     send(client, "[CLIENT DISCONNECTED]", DISCONNECT)
-    time.sleep(2)
-    client.close()
 
 
 # handle client in separate thread
 def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
-
+    with clients_lock:
+        clients[conn] = None
     try: 
         connected = True
         while connected:
@@ -297,7 +296,6 @@ def handle_client(conn, addr):
                 handle_unread(conn)
             elif operation == DISCONNECT:
                 raise Exception
-
     except:
         # TODO: What do we do when client disconnects?
         print(f"[{addr}] disconnected.")
@@ -312,8 +310,6 @@ def start():
         # block until new connection 
         conn, addr = server.accept()
         # locks client data structure when adding new client
-        # with clients_lock:
-        #     clients.add(conn)
         # new thread for each client so it doesn't block the server
         thread = threading.Thread(target=handle_client, args=(conn, addr))
         thread.start()

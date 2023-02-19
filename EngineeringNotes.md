@@ -42,3 +42,8 @@ My thoughts on client side structure:
 - Add constraints to username (can't contain :)
 - Added better error messages
 - Do we want a Trie in order to make text wildcard efficient when searching for user accounts? 
+
+
+2/19: 
+- Error handling with wrong key inputs
+- Handle client disconnection from forced control + z and control + c
