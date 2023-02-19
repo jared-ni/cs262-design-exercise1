@@ -70,14 +70,14 @@ def send(client, msg, operation_code):
     # 5. send message
     try:
         client.send(version + operation + header_length + message_length + message)
-    except BrokenPipeError:
+    except BrokenPipeError or OSError:
         print("Connection to server lost.")
         logged_in[0] = False
         forced_disconnect(client)
-    except IOError as e:
+    except Exception as e:
         # recoverable EAGAIN and EWOULDBLOCK error: try again
         if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
-            send(client, msg, operation_code)
+            return
         print('Sending error', str(e))
         forced_disconnect(client)
 
@@ -97,23 +97,25 @@ def listening_thread(client):
                 continue
             print('Reading error', str(e))
             forced_disconnect(client)
+        except Exception as e:
+            forced_disconnect(client)
 
 
 # a separate thread for listening to messages from server that are par the wired protocol.
 # Returns True on success, False on failure
 def listen_from_server(client, logged_in):
     version = int.from_bytes(client.recv(p_sizes["ver"]), BYTE_ORDER)
+    if not version: 
+        print(f"Server/Client connection might be lost.")
+        forced_disconnect(client)
     if version != VERSION:
-        print(f"Server/Client connection might be lost,\
-               or server version {version} is not compatible with client version {VERSION}.")
-        # TODO: send message to server to disconnect it
-        return False
+        print(f"Server/Client connection might be lost, or server version {version} is not compatible with client version {VERSION}.")
+        forced_disconnect(client)
     # 2. operation code
     operation = int.from_bytes(client.recv(p_sizes["op"]), BYTE_ORDER)
     if operation not in defined_operations:
         print(f"Operation {operation} not supported!")
-        # TODO: send message to client to disconnect it
-        return False
+        forced_disconnect(client)
     # TODO: not sure what to do with header_length
     _header_length = int.from_bytes(client.recv(p_sizes["h_len"]), BYTE_ORDER)
     # 3. message length
@@ -237,7 +239,7 @@ def disconnect_client(client):
 def forced_disconnect(client):
     print("\nDisconnected from server.")
     send(client, "", DISCONNECT)
-    time.sleep(1)
+    time.sleep(0.5)
     client.close()
     exit(0)
 
