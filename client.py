@@ -250,6 +250,7 @@ def start():
     SERVER = socket.gethostbyname(socket.gethostname())
     print(f"Server IP: {SERVER}")
 
+    # configure the server address
     while True:
         response = input("Is the server on this machine? (yes/no) ")
         if response.lower() == 'yes':
@@ -269,7 +270,6 @@ def start():
     
     # handle ctrl-z
     signal.signal(signal.SIGTSTP, lambda x, y: forced_disconnect(client))
-    
     # start another listening thread for server messages
     threading.Thread(target=listening_thread, args=(client, )).start()
 
