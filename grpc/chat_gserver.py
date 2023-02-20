@@ -4,6 +4,7 @@ import time
 import chat_pb2 as chat
 import chat_pb2_grpc as rpc
 from collections import deque
+import threading
 
 
 class ChatServer(rpc.ChatServerServicer):
@@ -13,6 +14,9 @@ class ChatServer(rpc.ChatServerServicer):
         self.users = {}
         # maps context.peer() to username
         self.clients = {}
+        self.users_lock = threading.Lock()
+        self.clients_lock = threading.Lock()
+
 
     # The stream which will be used to send new messages to clients
     def ChatStream(self, _request_iterator, context):
@@ -31,10 +35,6 @@ class ChatServer(rpc.ChatServerServicer):
 
     # Send a message to the server then to the receiver
     def SendNote(self, request: chat.Note, context):
-        print("sender: " + request.sender)
-        print("receiver: " + request.receiver)
-        print("message: " + request.message)
-        print()
         current_user = self.clients[context.peer()]
         if not current_user:
             return chat.ServerResponse(success=False, message="[SERVER] You are not logged in")
@@ -44,8 +44,8 @@ class ChatServer(rpc.ChatServerServicer):
             return chat.ServerResponse(success=False, message="[SERVER] User does not exist")
         
         # append to unread
-        self.users[request.receiver]['unread'].append(request)
-        print(self.users)
+        with self.users_lock:
+            self.users[request.receiver]['unread'].append(request)
         return chat.ServerResponse(success=True, message="")
     
     
@@ -55,13 +55,13 @@ class ChatServer(rpc.ChatServerServicer):
         if request.username in self.users:
             return chat.ServerResponse(success=False, message="[SERVER] Username already taken")
         # Create the account
-        self.users[request.username] = {
-            "password": request.password, 
-            "client": context.peer(),
-            "logged_in": False,
-            "unread": deque()
-        }
-        print(self.users)
+        with self.users_lock:
+            self.users[request.username] = {
+                "password": request.password, 
+                "client": context.peer(),
+                "logged_in": False,
+                "unread": deque()
+            }
         return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} created")
     
 
@@ -79,13 +79,15 @@ class ChatServer(rpc.ChatServerServicer):
 
         if context.peer() in self.clients and self.clients[context.peer()] is not None:
             prev_user = self.clients[context.peer()]
-            self.users[prev_user]["logged_in"] = False
-            self.users[prev_user]["client"] = None
-        self.clients[context.peer()] = request.username
-        self.users[request.username]['client'] = context.peer()
-        self.users[request.username]['logged_in'] = True
+            with self.users_lock:
+                self.users[prev_user]["logged_in"] = False
+                self.users[prev_user]["client"] = None
+        with self.clients_lock:
+            self.clients[context.peer()] = request.username
+        with self.users_lock:
+            self.users[request.username]['client'] = context.peer()
+            self.users[request.username]['logged_in'] = True
 
-        print(self.clients)
         return chat.ServerResponse(success=True, message=f"[SERVER] Logged in as {request.username}")
 
 
@@ -96,17 +98,17 @@ class ChatServer(rpc.ChatServerServicer):
             return chat.ServerResponse(success=False, message="[SERVER] You are not logged in")
         # Logout the user
         username = self.clients[context.peer()]
-        print("Username: " + username)
 
-        self.users[username]['logged_in'] = False
-        self.users[username]['client'] = None
-        del self.clients[context.peer()]
+        with self.users_lock:
+            self.users[username]['logged_in'] = False
+            self.users[username]['client'] = None
+        with self.clients_lock:
+            del self.clients[context.peer()]
 
         return chat.ServerResponse(success=True, message=f"[SERVER] Logged out of user {username}")
 
     # Account list
     def ListAccounts(self, request: chat.AccountInfo, context):
-        print("ListAccounts")
         # Lists all users in the users dict
         for user in self.users.keys():
             if request.username == "*" or not request.username or request.username in user:
@@ -118,7 +120,7 @@ if __name__ == '__main__':
     port = 43210
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10)) 
     rpc.add_ChatServerServicer_to_server(ChatServer(), server) 
-    print('Starting server. Listening...')
+    print('[SERVER STARTING] Listening on port ' + str(port) + '...')
     server.add_insecure_port('localhost:' + str(port))
     server.start()
 
