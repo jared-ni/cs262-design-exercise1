@@ -118,6 +118,19 @@ class Client:
             print(account.message)
         print()
        
+    # deletes an account
+    def delete_account(self, account):
+        n = chat.AccountInfo()
+        if account:
+            n.username = account
+        else:
+            n.username = self.username
+        password = input(f"Password for account {}: ")
+        response = self.conn.DeleteAccount(n)
+        if response.success:
+            self.username = ""
+        print(response.message)
+
 
     # communicate with server loop
     def communicate_with_server(self):
@@ -133,6 +146,8 @@ class Client:
             message = input()
             if not message:
                 continue
+            elif message[:8].lower() == "./delete":
+                self.delete_account(message[8:].strip().lower())
             elif message.lower() == "./help":
                 # print_help()
                 pass

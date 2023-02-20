@@ -35,5 +35,7 @@ service ChatServer {
 	rpc Logout (Empty) returns (ServerResponse);
 	// list accounts
 	rpc ListAccounts (AccountInfo) returns (stream ServerResponse);
+	// delete account
+	rpc DeleteAccount (AccountInfo) returns (ServerResponse);
 }
 

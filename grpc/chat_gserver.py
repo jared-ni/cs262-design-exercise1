@@ -114,7 +114,21 @@ class ChatServer(rpc.ChatServerServicer):
             if request.username == "*" or not request.username or request.username in user:
                 yield chat.ServerResponse(success=True, message=f"{user}")
                 
-
+    # Account delete
+    def DeleteAccount(self, request: chat.AccountInfo, context):
+        # Check if the username exists
+        if request.username not in self.users:
+            return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
+        # Check if the password is correct
+        if self.users[request.username]['password'] != request.password:
+            return chat.ServerResponse(success=False, message="[SERVER] Incorrect password")
+        # Delete the account
+        if self.clients[context.peer()].lower() == request.username.lower():
+            with self.clients_lock:
+                del self.clients[context]
+        with self.users_lock:
+            del self.users[request.username]
+        return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} deleted")
 
 if __name__ == '__main__':
     port = 43210
