@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package chat_grpc;
+
+service AccountBook {
+	rpc CreateAccount (Account) returns (requestReply);
+	rpc GetAccountBalance (AccountID) returns (AccountBalance);
+	rpc GetAccountOutstanding (AccountID) returns (AccountOutstanding);
+	rpc GetAccountName (AccountID) returns (AccountName);
+	rpc MakeDeposit (makeDeposit) returns (requestReply);
+	rpc MakeWithdrawal (makeWithdrawal) returns (requestReply);
+	rpc MakeTransfer (makeTransfer) returns (requestReply);
+}

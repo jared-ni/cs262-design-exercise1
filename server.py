@@ -232,6 +232,8 @@ def handle_delete(client, payload):
     else:
         with users_lock:
             del users[username]
+        with clients_lock:
+            del clients[client]
         send(client, f"Successfully deleted user {username}", DELETE)
 
 

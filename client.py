@@ -5,10 +5,9 @@ from hashlib import blake2b
 from sys import exit 
 import signal
 import errno
+import sys
 
-PORT = 48789
-SERVER = socket.gethostbyname(socket.gethostname())
-ADDR = (SERVER, PORT)
+
 FORMAT = "utf-8"
 BYTE_ORDER = "big"
 
@@ -42,18 +41,6 @@ p_sizes = {
 CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
 
 logged_in = [False]
-
-
-# 1. connect client to server
-def connect():
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        client.connect(ADDR)
-        print(f"Connected to {SERVER} on port {PORT}.")
-        return client
-    except ConnectionRefusedError:
-        print('Connection refused. Check if server is running.')
-        return None
 
 
 # send client message as per standards defined by the wired protocol
@@ -217,7 +204,6 @@ def delete_user(client):
             password = get_hashed_password(password)
             send(client, password, DELETE)
             time.sleep(0.5)
-            logged_in[0] = False
             return True
         elif response.lower() == 'no':
             print_commands()
@@ -259,9 +245,25 @@ def print_commands():
 
 # main function
 def start():
+    # checks for host import
+    PORT = 48789
+    SERVER = socket.gethostbyname(socket.gethostname())
+    print(f"Server IP: {SERVER}")
+
+    while True:
+        response = input("Is the server on this machine? (yes/no) ")
+        if response.lower() == 'yes':
+            break
+        elif response.lower() == 'no':
+            if len(sys.argv) != 2:
+                print(sys.argv)
+                print("Usage: python3 client.py <host>")
+                return
+            SERVER = sys.argv[1]
+            break
 
     # returns client socket on success
-    client = connect()
+    client = connect(PORT, SERVER)
     if client is None:
         return 
     
@@ -304,7 +306,8 @@ def start():
                     if not logged_in[0]:
                         print("You are not logged in.")
                         continue
-                    if delete_user(client):
+                    delete_user(client)
+                    if not logged_in[0]:
                         register_user(client)
                         login_user(client)
                 elif message == "./disconnect":
@@ -322,7 +325,20 @@ def start():
     except Exception as e:
         print(e)
         forced_disconnect(client)
-    
+
+
+# 1. connect client to server
+def connect(PORT, SERVER):
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        client.connect((SERVER, PORT))
+        print(f"Connected to {SERVER} on port {PORT}.")
+        return client
+    except ConnectionRefusedError:
+        print('Connection refused. Check if server is running.')
+        return None
+
+
 
 if __name__ == "__main__":
     start()

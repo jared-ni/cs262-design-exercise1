@@ -47,3 +47,10 @@ My thoughts on client side structure:
 2/19: 
 - Error handling with wrong key inputs
 - Handle client disconnection from forced control + z and control + c
+
+
+2/19 (day time): 
+- Still need to add multiple-people features. 
+- Need to encrypt messages. 
+
+- Delete doesn't actually log poeople out!!!!!
