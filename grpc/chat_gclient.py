@@ -105,6 +105,20 @@ class Client:
         print(response.message)
 
 
+    # list accounts
+    def list_accounts(self, magic_word):
+        n = chat.AccountInfo()
+        n.username = magic_word.strip()
+
+        print("Current accounts:")
+        for account in self.conn.ListAccounts(n):
+            if not account.success:
+                print("Account Listing Error")
+                break
+            print(account.message)
+        print()
+       
+
     # communicate with server loop
     def communicate_with_server(self):
         # register user
@@ -116,17 +130,16 @@ class Client:
             pass
 
         while True:
-            message = input().lower()
+            message = input()
             if not message:
                 continue
-            elif message == "./help":
+            elif message.lower() == "./help":
                 # print_help()
                 pass
-            elif message[:6] == "./list":
+            elif message[:6].lower() == "./list":
                 # TODO: MAGIC WORD
-                pass
-                # magic_word = message[7:].strip().lower()
-            elif message == "./register":
+                self.list_accounts(message[7:].strip().lower())
+            elif message.lower() == "./register":
                 successful = self.register_user()
                 time.sleep(0.5)
                 if not successful:
@@ -134,9 +147,9 @@ class Client:
                 # if not logged in and registered, login
                 elif not self.username and successful:
                     self.login_user()
-            elif message == "./login":
+            elif message.lower() == "./login":
                 self.login_user()
-            elif message == "./logout":
+            elif message.lower() == "./logout":
                 self.logout()
             else:
                 firstColon = message.find(':')

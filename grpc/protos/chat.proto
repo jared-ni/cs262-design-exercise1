@@ -33,5 +33,7 @@ service ChatServer {
 	rpc Login (AccountInfo) returns (ServerResponse);
 	// get unread
 	rpc Logout (Empty) returns (ServerResponse);
+	// list accounts
+	rpc ListAccounts (AccountInfo) returns (stream ServerResponse);
 }
 

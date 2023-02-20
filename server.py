@@ -197,6 +197,7 @@ def handle_unread(client):
 
 
 # print out all users registered
+# TODO: apply some regex to filter out users
 def handle_list(client, payload):
     print(f"handle_list: {client}, {payload}")
     

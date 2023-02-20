@@ -17,8 +17,8 @@ class ChatServer(rpc.ChatServerServicer):
     # The stream which will be used to send new messages to clients
     def ChatStream(self, _request_iterator, context):
         # For every client a infinite loop starts (in gRPC's own managed thread)
+        user = None
         while True:
-            user = None
             if context.peer() in self.clients:
                 user = self.clients[context.peer()]
             if not user:
@@ -66,6 +66,7 @@ class ChatServer(rpc.ChatServerServicer):
     
 
     # Account Login 
+    # TODO: Need to fix loggin in on multiple clients
     def Login(self, request: chat.AccountInfo, context):
         # Check if the username exists
         if request.username not in self.users:
@@ -85,7 +86,6 @@ class ChatServer(rpc.ChatServerServicer):
         self.users[request.username]['logged_in'] = True
 
         print(self.clients)
-
         return chat.ServerResponse(success=True, message=f"[SERVER] Logged in as {request.username}")
 
 
@@ -103,6 +103,15 @@ class ChatServer(rpc.ChatServerServicer):
         del self.clients[context.peer()]
 
         return chat.ServerResponse(success=True, message=f"[SERVER] Logged out of user {username}")
+
+    # Account list
+    def ListAccounts(self, request: chat.AccountInfo, context):
+        print("ListAccounts")
+        # Lists all users in the users dict
+        for user in self.users.keys():
+            if request.username == "*" or not request.username or request.username in user:
+                yield chat.ServerResponse(success=True, message=f"{user}")
+                
 
 
 if __name__ == '__main__':
