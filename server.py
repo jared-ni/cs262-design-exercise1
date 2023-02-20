@@ -89,6 +89,7 @@ def handle_register(client, payload):
             send(client, "Username already exists!", SERVER_MESSAGE)
             return
         # add new user to clients dictionary
+        # TODO: remove "messages"
         with users_lock:
             users[username] = {
                 # TODO: hash password
@@ -196,6 +197,7 @@ def handle_unread(client):
 
 
 # print out all users registered
+# TODO: apply some regex to filter out users
 def handle_list(client, payload):
     print(f"handle_list: {client}, {payload}")
     
@@ -239,6 +241,7 @@ def handle_delete(client, payload):
 
 # handle disconnect
 def handle_disconnect(client):
+    # TODO: if user is not logged in? 
     if client not in clients:
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return

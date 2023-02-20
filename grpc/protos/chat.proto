@@ -13,9 +13,29 @@ message Note {
     string message = 5;
 }
 
+message ServerResponse {
+	int32 success = 1;
+	string message = 2;
+}
+
+message AccountInfo {
+	string username = 1;
+	string password = 2;
+}
+
 service ChatServer {
     // This bi-directional stream makes it possible to send and receive Notes between 2 persons
     rpc ChatStream (Empty) returns (stream Note);
-    rpc SendNote (Note) returns (Empty);
+    rpc SendNote (Note) returns (ServerResponse);
+	// account creation
+	rpc CreateAccount (AccountInfo) returns (ServerResponse);
+	// account login
+	rpc Login (AccountInfo) returns (ServerResponse);
+	// get unread
+	rpc Logout (Empty) returns (ServerResponse);
+	// list accounts
+	rpc ListAccounts (AccountInfo) returns (stream ServerResponse);
+	// delete account
+	rpc DeleteAccount (AccountInfo) returns (ServerResponse);
 }
 
