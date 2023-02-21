@@ -15,6 +15,7 @@ class Client:
         # create a gRPC channel + stub
         channel = grpc.insecure_channel(address + ':' + str(port))
         self.conn = rpc.ChatServerStub(channel)
+        
         # create new listening thread for when new message streams come in
         threading.Thread(target=self.__listen_for_messages, daemon=True).start()
         
@@ -96,6 +97,7 @@ class Client:
             elif login.lower() == 'no':
                 return False
     
+
     # logout user
     def logout(self):
         n = chat.Empty()
@@ -118,6 +120,7 @@ class Client:
             print(account.message)
         print()
        
+
     # deletes an account
     def delete_account(self, account):
         n = chat.AccountInfo()
@@ -125,8 +128,9 @@ class Client:
             n.username = account
         else:
             n.username = self.username
-        password = input(f"Password for account {}: ")
+        n.password = input(f"Password for account {n.username}: ")
         response = self.conn.DeleteAccount(n)
+
         if response.success:
             self.username = ""
         print(response.message)
@@ -141,7 +145,6 @@ class Client:
         if logged_in:
             # TODO: self.load_unread()
             pass
-
         while True:
             message = input()
             if not message:
