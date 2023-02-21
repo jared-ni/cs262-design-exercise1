@@ -83,7 +83,7 @@ def handle_register(client, payload):
     if not payload:
         return
     try:
-        username, password = payload.split("~")
+        username, password = payload.split("~:>")
         # if username already exists, send error message
         if username in users:
             send(client, "Username already exists!", SERVER_MESSAGE)
@@ -109,7 +109,7 @@ def handle_login(client, payload):
     if not payload:
         return 
     try:
-        username, password = payload.split("~")
+        username, password = payload.split("~:>")
         # if username doesn't exist, send error message
         if username not in users:
             send(client, "Username does not exist!", SERVER_MESSAGE)
@@ -217,13 +217,14 @@ def handle_list(client, payload):
 
 # delete current user's account
 def handle_delete(client, payload):
-    if client not in clients:
-        send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
+    username, password = payload.split("~:>")
+    if not username:
+        username = clients[client]
+    if username not in users:
+        send(client, f"Account {username} does not exist!", SERVER_MESSAGE)
         return
-
-    username = clients[client]
-    if not check_password(payload, users[username]["password"]):
-        send(client, "Incorrect password!", SERVER_MESSAGE)
+    if not check_password(password, users[username]["password"]):
+        send(client, f"Incorrect password for account {username}!", SERVER_MESSAGE)
         return
     else:
         with users_lock:
@@ -274,7 +275,9 @@ def handle_client(conn, addr):
                 # TODO: send message to client to disconnect it
                 return 
             # TODO: not sure what to do with header_length
-            _header_length = int.from_bytes(conn.recv(p_sizes["h_len"]), BYTE_ORDER)
+            header_length = int.from_bytes(conn.recv(p_sizes["h_len"]), BYTE_ORDER)
+            if header_length != 5:
+                print(f"Header length {header_length} not supported!")
             # 3. message length
             message_length = int.from_bytes(conn.recv(p_sizes["m_len"]), BYTE_ORDER)
             # 4. message data
