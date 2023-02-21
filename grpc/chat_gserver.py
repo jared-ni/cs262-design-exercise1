@@ -5,6 +5,7 @@ import chat_pb2 as chat
 import chat_pb2_grpc as rpc
 from collections import deque
 import threading
+import bcrypt
 
 
 class ChatServer(rpc.ChatServerServicer):
@@ -17,6 +18,14 @@ class ChatServer(rpc.ChatServerServicer):
         self.users_lock = threading.Lock()
         self.clients_lock = threading.Lock()
 
+    # hash password again for storage
+    def hash_password(self, password):
+        return bcrypt.hashpw(password.encode(FORMAT), bcrypt.gensalt())
+
+    # return true if password matches hashed password
+    def check_password(self, password, hashed_password):
+        # print(hashed_password)
+        return bcrypt.checkpw(password.encode(FORMAT), hashed_password)
 
     # The stream which will be used to send new messages to clients
     def ChatStream(self, _request_iterator, context):
@@ -57,8 +66,8 @@ class ChatServer(rpc.ChatServerServicer):
         # Create the account
         with self.users_lock:
             self.users[request.username] = {
-                "password": request.password, 
-                "client": context.peer(),
+                "password": self.hash_password(request.password), 
+                "client": None,
                 "logged_in": False,
                 "unread": deque()
             }
@@ -72,8 +81,18 @@ class ChatServer(rpc.ChatServerServicer):
         if request.username not in self.users:
             return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
         # Check if the password is correct
-        if self.users[request.username]['password'] != request.password:
+        if not self.check_password(request.password, self.users[request.username]['password']):
             return chat.ServerResponse(success=False, message="[SERVER] Incorrect password")
+        
+        if request.username in self.users and self.users[request.username]["client"] is not None:
+            detection = chat.Note(message = f"Logged out: detected {request.username} login on another client.")
+            self.users[request.username]["unread"].append(detection)
+            # wait for previous client to get message
+            time.sleep(1)
+            prev_client = self.users[request.username]["client"]
+            with self.clients_lock:
+                self.clients[prev_client] = None
+            
         # Login the user
         self.users[request.username]['logged_in'] = True
 
@@ -93,6 +112,9 @@ class ChatServer(rpc.ChatServerServicer):
 
     # Account Logout
     def Logout(self, request: chat.Empty, context):
+        print("logout")
+        print(self.clients)
+        print(self.users)
         # Check if the username exists
         if context.peer() not in self.clients or self.clients[context.peer()] is None:
             return chat.ServerResponse(success=False, message="[SERVER] You are not logged in")
@@ -103,9 +125,10 @@ class ChatServer(rpc.ChatServerServicer):
             self.users[username]['logged_in'] = False
             self.users[username]['client'] = None
         with self.clients_lock:
-            del self.clients[context.peer()]
+            self.clients[context.peer()] = None
 
         return chat.ServerResponse(success=True, message=f"[SERVER] Logged out of user {username}")
+
 
     # Account list
     def ListAccounts(self, request: chat.AccountInfo, context):
@@ -122,7 +145,7 @@ class ChatServer(rpc.ChatServerServicer):
         if request.username not in self.users:
             return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
         # Check if the password is correct
-        if self.users[request.username]['password'] != request.password:
+        if self.check_password(request.password, self.users[request.username]['password']):
             return chat.ServerResponse(success=False, message=f"[SERVER] Incorrect password for account {request.username}")
         # Delete the account
         if self.clients[context.peer()].lower() == request.username.lower():
@@ -133,7 +156,9 @@ class ChatServer(rpc.ChatServerServicer):
         return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} deleted")
 
 
+# main thread for handling clients
 if __name__ == '__main__':
+    FORMAT = "utf-8"
     port = 43210
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10)) 
     rpc.add_ChatServerServicer_to_server(ChatServer(), server)

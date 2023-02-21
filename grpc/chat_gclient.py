@@ -3,9 +3,12 @@ import grpc
 import chat_pb2 as chat
 import chat_pb2_grpc as rpc
 import time 
+from hashlib import blake2b
 
 address = 'localhost'
 port = 43210
+CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
+FORMAT = "utf-8"
 
 
 class Client:
@@ -62,7 +65,7 @@ class Client:
                 # AccountInfo
                 n = chat.AccountInfo()
                 n.username = username
-                n.password = password
+                n.password = self.get_hashed_password(password)
                 response = self.conn.CreateAccount(n)
                 print(response.message)
                 if response.success:
@@ -85,7 +88,7 @@ class Client:
                 password = input("Password: ")
                 n = chat.AccountInfo()
                 n.username = username
-                n.password = password
+                n.password = self.get_hashed_password(password)
                 response = self.conn.Login(n)
 
                 print(response.message)
@@ -104,7 +107,7 @@ class Client:
         response = self.conn.Logout(n)
         if response.success:
             self.username = ""
-        print(response.message)
+        # print(response.message)
 
 
     # list accounts
@@ -129,6 +132,7 @@ class Client:
         else:
             n.username = self.username
         n.password = input(f"Password for account {n.username}: ")
+        n.password = self.get_hashed_password(n.password)
         response = self.conn.DeleteAccount(n)
 
         if response.success:
@@ -178,6 +182,12 @@ class Client:
                 message = message[firstColon + 1:]
                 self.send_message(user, message)
 
+    # get hashed password
+    def get_hashed_password(self, password):
+        h = blake2b(key=CLIENT_KEY, digest_size=16)
+        h.update(password.encode(FORMAT))
+        return h.hexdigest()
+    
 
 if __name__ == '__main__':
     Client()  # this starts a client and thus a thread which keeps connection to server open
