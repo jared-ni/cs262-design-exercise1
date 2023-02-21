@@ -7,19 +7,18 @@ import signal
 import errno
 import sys
 
-
 FORMAT = "utf-8"
 BYTE_ORDER = "big"
 
 """
-wired protocol definitions: 
+wired protocol header definitions: 
 1. version (1 bytes)
 2. operation code (1 bytes)
 3. header length (1 byte)
 4. message length (2 bytes)
 4. message data (message length bytes)
 """
-# 1. version
+# 1. version number
 VERSION = 1
 # 2. operation_codes
 REGISTER = 1
@@ -32,6 +31,7 @@ SERVER_MESSAGE = 7
 UNREAD = 8
 DISCONNECT = 9
 defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, UNREAD, DISCONNECT])
+# wired protocol header sizes
 p_sizes = {
     "ver": 1,
     "op": 1,
@@ -39,7 +39,6 @@ p_sizes = {
     "m_len": 2
 }
 CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
-
 logged_in = [False]
 
 
@@ -68,6 +67,7 @@ def send(client, msg, operation_code):
         print('Sending error', str(e))
         forced_disconnect(client)
 
+
 # Continually listens to messages from server on another thread
 def listening_thread(client):
     connected = True
@@ -91,12 +91,13 @@ def listening_thread(client):
 # a separate thread for listening to messages from server that are par the wired protocol.
 # Returns True on success, False on failure
 def listen_from_server(client, logged_in):
+    # Unpacks header data of the message from server
     version = int.from_bytes(client.recv(p_sizes["ver"]), BYTE_ORDER)
     if not version: 
         print(f"Server/Client connection might be lost.")
         forced_disconnect(client)
     if version != VERSION:
-        print(f"Server/Client connection might be lost, or server version {version} is not compatible with client version {VERSION}.")
+        print(f"Server version {version} is not compatible with client version {VERSION}.")
         forced_disconnect(client)
     # 2. operation code
     operation = int.from_bytes(client.recv(p_sizes["op"]), BYTE_ORDER)
@@ -104,24 +105,26 @@ def listen_from_server(client, logged_in):
         print(f"Operation {operation} not supported!")
         forced_disconnect(client)
     # TODO: not sure what to do with header_length
-    _header_length = int.from_bytes(client.recv(p_sizes["h_len"]), BYTE_ORDER)
+    header_length = int.from_bytes(client.recv(p_sizes["h_len"]), BYTE_ORDER)
+    if header_length != 5:
+        print(f"Header length {header_length} not supported!")
+        forced_disconnect(client)
     # 3. message length
     message_length = int.from_bytes(client.recv(p_sizes["m_len"]), BYTE_ORDER)
     # 4. message data
     message_data = client.recv(message_length).decode(FORMAT)
 
-    # if receiving from another client, print out
+    # Case matching based on operation code
     if operation == RECEIVE:
         username, content = message_data.split("~:>")
         print(f"([{username}] {content})")
         return True
     # if receiving from server, print differently
-    elif operation == SERVER_MESSAGE:
+    elif operation == SERVER_MESSAGE or operation == REGISTER:
         print("[SERVER] " + message_data)
         return True
-    # register op code == account registered/logged-in successfully
-    elif operation == REGISTER:
-        print("[SERVER] " + message_data)
+    elif operation == LIST:
+        print(message_data)
         return True
     elif operation == LOGIN:
         logged_in[0] = True
@@ -131,9 +134,6 @@ def listen_from_server(client, logged_in):
     elif operation == DELETE:
         logged_in[0] = False
         print("[SERVER] " + message_data)
-        return True
-    elif operation == LIST:
-        print(message_data)
         return True
     elif operation == DISCONNECT:
         logged_in[0] = False
@@ -166,7 +166,7 @@ def register_user(client):
                 continue
             # TODO: Hash password
             password = get_hashed_password(password)
-            send(client, f"{username}~{password}", REGISTER)
+            send(client, f"{username}~:>{password}", REGISTER)
             return True
         elif register.lower() == 'no':
             print_commands()
@@ -185,7 +185,7 @@ def login_user(client):
                 continue
             password = input("Password: ")
             password = get_hashed_password(password)
-            send(client, f"{username}~{password}", LOGIN)
+            send(client, f"{username}~:>{password}", LOGIN)
             return True
         elif login.lower() == 'no':
             print_commands()
@@ -193,34 +193,24 @@ def login_user(client):
 
 
 # delete the current user. Return whether account is deleted
-def delete_user(client):
-    if not logged_in[0]:
-        print("You are not logged in.")
-        return False
+def delete_user(client, account):
+    if not account and not logged_in[0]:
+        print("Please login or specify the account to delete.")
+        return False 
+
     while True:
-        response = input("Are you sure you want to delete your account? (yes/no) ")
+        response = input(f"Are you sure you want to delete this account? (yes/no) ")
         if response.lower() == 'yes':
-            password = input("Enter your password: ")
+            password = input(f"Enter password: ")
             password = get_hashed_password(password)
-            send(client, password, DELETE)
+            send(client, account + "~:>" + password, DELETE)
             time.sleep(0.5)
             return True
         elif response.lower() == 'no':
             print_commands()
             return False
-
-
-# delete the current user. Return whether account is deleted
-def disconnect_client(client):
-    while True:
-        response = input("Are you sure you want to disconnect? (yes/no) ")
-        if response.lower() == 'yes':
-            send(client, "", DISCONNECT)
-            return True
-        elif response.lower() == 'no':
-            print_commands()
-            return False
         
+
 # forced disconnect from server
 def forced_disconnect(client):
     print("\nDisconnected from server.")
@@ -229,102 +219,20 @@ def forced_disconnect(client):
     client.close()
     exit(0)
 
+
 # prints out the help menu
 def print_help():
     print("Commands:")
     print("\t./list: list all users,")
     print("\t./register: register a new account,")
     print("\t./login: log in to an existing account,")
-    print("\t./delete: delete your account,")
+    print("\t./delete <user>: delete account <user> (<user> = current user by default),")
     print("\t./disconnect: disconnect from the server,")
     print("\t<user>: <message>: send a message to a user.")
 
+
 def print_commands():
     print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./disconnect. Type ./help for more info.")
-
-
-# main function
-def start():
-    # checks for host import
-    PORT = 48789
-    SERVER = socket.gethostbyname(socket.gethostname())
-    print(f"Server IP: {SERVER}")
-
-    # configure the server address
-    while True:
-        response = input("Is the server on this machine? (yes/no) ")
-        if response.lower() == 'yes':
-            break
-        elif response.lower() == 'no':
-            if len(sys.argv) != 2:
-                print(sys.argv)
-                print("Usage: python3 client.py <host>")
-                return
-            SERVER = sys.argv[1]
-            break
-
-    # returns client socket on success
-    client = connect(PORT, SERVER)
-    if client is None:
-        return 
-    
-    # handle ctrl-z
-    signal.signal(signal.SIGTSTP, lambda x, y: forced_disconnect(client))
-    # start another listening thread for server messages
-    threading.Thread(target=listening_thread, args=(client, )).start()
-
-    try:
-        register_user(client)
-        time.sleep(0.5)
-        successful = login_user(client)
-        # deliver message whenever user first logs in
-        if successful:
-            send(client, "", UNREAD)
-        # input thread for user messages
-        disconnected = False
-        while not disconnected:
-            message = input().lower()
-            if message:
-                if message == "./help":
-                    print_help()
-                elif message[:6] == "./list":
-                    # TODO: MAGIC WORD
-                    magic_word = message[7:].strip().lower()
-                    send(client, magic_word, LIST)
-                elif message == "./register":
-                    successful = register_user(client)
-                    time.sleep(0.5)
-                    if not successful:
-                        register_user(client)
-                    elif not logged_in[0] and successful:
-                        login_user(client)
-                elif message == "./login":
-                    login_user(client)
-                    if successful:
-                        send(client, "", UNREAD)
-                elif message == "./delete":
-                    if not logged_in[0]:
-                        print("You are not logged in.")
-                        continue
-                    delete_user(client)
-                    if not logged_in[0]:
-                        register_user(client)
-                        login_user(client)
-                elif message == "./disconnect":
-                    if not logged_in[0]:
-                        print("You are not logged in.")
-                        continue
-                    send(client, "", DISCONNECT)
-                    break
-                else:
-                    send(client, message, SEND)
-    # handle ctrl-c quit 
-    except KeyboardInterrupt:
-        print("Disconnecting from server...")
-        forced_disconnect(client)
-    except Exception as e:
-        print(e)
-        forced_disconnect(client)
 
 
 # 1. connect client to server
@@ -339,6 +247,99 @@ def connect(PORT, SERVER):
         return None
 
 
+# disconnect_client
+def disconnect_client(client):
+    if not logged_in[0]:
+        print("\n[DISCONNECTED]")
+        client.close()
+        time.sleep(0.5)
+        exit(0)
+    else:
+        send(client, "", DISCONNECT)
+
+
+# main function
+def start():
+    
+    # configure the server address
+    PORT = 48789
+    SERVER = socket.gethostbyname(socket.gethostname())
+    try:
+        while True:
+            response = input("Is the server on this machine? (yes/no) ")
+            if response.lower() == 'yes':
+                break
+            elif response.lower() == 'no':
+                if len(sys.argv) != 2:
+                    print(sys.argv)
+                    print("Usage: python3 client.py <host>")
+                    return
+                SERVER = sys.argv[1]
+                break
+    except KeyboardInterrupt:
+        print("\n[DISCONNECTED]")
+        exit(0)
+
+    # returns client socket on success
+    client = connect(PORT, SERVER)
+    if client is None:
+        return 
+    # handle ctrl-z and ctrl-c
+    signal.signal(signal.SIGTSTP, lambda x, y: forced_disconnect(client))
+    signal.signal(signal.SIGINT, lambda x, y: forced_disconnect(client))
+
+    # start another listening thread for server messages
+    threading.Thread(target=listening_thread, args=(client, )).start()
+
+    register_user(client)
+    time.sleep(0.5)
+    successful = login_user(client)
+    # deliver message whenever user first logs in
+    if successful:
+        send(client, "", UNREAD)
+
+    # input thread for user messages that handles different commands
+    while True:
+        try: 
+            message = input()
+            message_lower = message.lower()
+            if not message:
+                continue
+            elif message_lower == "./help":
+                print_help()
+            elif message[:6] == "./list":
+                # TODO: MAGIC WORD
+                magic_word = message[7:].strip().lower()
+                send(client, magic_word, LIST)
+            elif message_lower == "./register":
+                successful = register_user(client)
+                time.sleep(0.5)
+                if not successful:
+                    register_user(client)
+                elif not logged_in[0] and successful:
+                    login_user(client)
+            elif message_lower == "./login":
+                login_user(client)
+                if successful:
+                    send(client, "", UNREAD)
+            elif message_lower[:8] == "./delete":
+                delete_user(client, message[8:].strip().lower())
+            elif message_lower == "./disconnect":
+                disconnect_client(client)
+                break
+            else:
+                send(client, message, SEND)
+        
+        except IOError as e:
+            # ignore recoverable EAGAIN and EWOULDBLOCK error
+            if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
+                continue
+            print('Reading error', str(e))
+            forced_disconnect(client)
+        except Exception as e:
+            print(e)
+            forced_disconnect(client)
+    
 
 if __name__ == "__main__":
     start()
