@@ -94,7 +94,7 @@ def handle_register(client, payload):
             users[username] = {
                 # TODO: hash password
                 "password": hash_password(password),
-                "client": client,
+                "client": None,
                 "logged_in": False,
                 "messages": [],
                 "unread": deque()
@@ -106,7 +106,6 @@ def handle_register(client, payload):
 
 # handle account login
 def handle_login(client, payload):
-    print(f"handle_login: {client}, {payload}")
     if not payload:
         return 
     try:
@@ -123,7 +122,14 @@ def handle_login(client, payload):
         # TODO: lock clients dictionary
         with users_lock:
             users[username]["logged_in"] = True
-        # if user was previously logged in, log them out
+        # if client was previously logged in, log them out
+        # TODO: log out user on previous client
+        if username in users and users[username]["client"] is not None:
+            prev_client = users[username]["client"]
+            with clients_lock:
+                clients[prev_client] = None
+            send(prev_client, f"Logged out: detected {username} login on another client.", DISCONNECT)
+
         with clients_lock:
             if client in clients and clients[client] is not None:
                 prev_user = clients[client]
@@ -143,8 +149,6 @@ def handle_login(client, payload):
 
 # handle sending messages
 def handle_send(client, payload):
-    print(f"handle_send: {client}, {payload}")
-
     if client not in clients:
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
@@ -163,7 +167,6 @@ def handle_send(client, payload):
         send(client, f"User {receiver} does not exist!", SERVER_MESSAGE)
         return
 
-    print("message: " + receiver + " " + message)
     # send message to receiver
     # TODO: what to do when receiver is not logged in?
     with users_lock:
@@ -172,11 +175,6 @@ def handle_send(client, payload):
             users[receiver]["unread"].appendleft(f"{clients[client]}~:>{message}")
         else:
             send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
-
-    # except Exception as e:
-    #     print(e)
-    #     client.send(f"Error: {e} on line {e.args}".encode(FORMAT))
-    #     return
 
 
 # handles unread messages by sending them to the client
@@ -199,8 +197,6 @@ def handle_unread(client):
 # print out all users registered
 # TODO: apply some regex to filter out users
 def handle_list(client, payload):
-    print(f"handle_list: {client}, {payload}")
-    
     if not payload or payload == "*":
         # Lists all users in the users dict
         send(client, f"List of users:", LIST)
@@ -221,8 +217,6 @@ def handle_list(client, payload):
 
 # delete current user's account
 def handle_delete(client, payload):
-    print(f"handle_delete: {client}, {payload}")
-    
     if client not in clients:
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return

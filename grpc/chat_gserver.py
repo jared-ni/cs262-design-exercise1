@@ -117,23 +117,26 @@ class ChatServer(rpc.ChatServerServicer):
     # Account delete
     def DeleteAccount(self, request: chat.AccountInfo, context):
         # Check if the username exists
+        print("request: ")
+        print(request)
         if request.username not in self.users:
             return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
         # Check if the password is correct
         if self.users[request.username]['password'] != request.password:
-            return chat.ServerResponse(success=False, message="[SERVER] Incorrect password")
+            return chat.ServerResponse(success=False, message=f"[SERVER] Incorrect password for account {request.username}")
         # Delete the account
         if self.clients[context.peer()].lower() == request.username.lower():
             with self.clients_lock:
-                del self.clients[context]
+                del self.clients[context.peer()]
         with self.users_lock:
             del self.users[request.username]
         return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} deleted")
 
+
 if __name__ == '__main__':
     port = 43210
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10)) 
-    rpc.add_ChatServerServicer_to_server(ChatServer(), server) 
+    rpc.add_ChatServerServicer_to_server(ChatServer(), server)
     print('[SERVER STARTING] Listening on port ' + str(port) + '...')
     server.add_insecure_port('localhost:' + str(port))
     server.start()

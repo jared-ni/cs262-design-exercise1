@@ -54,3 +54,5 @@ My thoughts on client side structure:
 - Need to encrypt messages. 
 
 - Delete doesn't actually log poeople out!!!!!
+
+- log one client out when another client is logged in
