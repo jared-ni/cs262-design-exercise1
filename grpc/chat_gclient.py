@@ -12,10 +12,11 @@ import socket
 # Generate grpc server code by running 
 # 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/chat.proto'
 
+# client-side hashing key of account password. Passwords cannot be unhashed. 
 CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
 FORMAT = "utf-8"
 
-
+# client class for all client-side functionalities
 class Client:
     def __init__(self):
         # the frame to put ui components on
@@ -46,11 +47,10 @@ class Client:
         self.conn = rpc.ChatServerStub(channel)
 
     
-    # call to start everything
+    # call to start everything: listening thread and the input thread
     def start(self):
         # create new listening thread for when new message streams come in
         threading.Thread(target=self.__listen_for_messages, daemon=True).start()
-        
         self.communicate_with_server()
 
 
@@ -87,7 +87,7 @@ class Client:
                 if not username:
                     print("Username cannot be empty.")
                     continue
-                # check if username contains ':'
+                # check that username doesn't contain ':'
                 if ":" in username:
                     print("Username cannot contain ':'")
                     continue
@@ -97,7 +97,8 @@ class Client:
                 if password != re_password:
                     print("Passwords do not match.")
                     continue
-
+                
+                # send gRPC message for registering user
                 n = chat.AccountInfo()
                 n.username = username
                 n.password = self.get_hashed_password(password)
@@ -110,7 +111,7 @@ class Client:
                 return False
     
     
-    # login user
+    # login user provided by argument
     def login_user(self):
         while True:
             login = input("Would you like to log in? (yes/no) ")
@@ -146,8 +147,7 @@ class Client:
             self.username = ""
 
 
-
-    # list accounts
+    # list all server accounts currently registered
     def list_accounts(self, magic_word):
         n = chat.AccountInfo()
         n.username = magic_word.strip()
@@ -161,7 +161,7 @@ class Client:
         print()
        
 
-    # deletes an account
+    # deletes an account, either provided by argument or current user
     def delete_account(self, account):
         n = chat.AccountInfo()
         if account:
@@ -171,6 +171,7 @@ class Client:
         n.password = input(f"Password for account {n.username}: ")
         n.password = self.get_hashed_password(n.password)
 
+        # get server response and print error message if unsuccessful, else print success message
         for response in self.conn.DeleteAccount(n):
             print(response.message)
             if not response.success:
@@ -197,16 +198,24 @@ class Client:
         print("\t<user>: <message>: send a message to <user>.")
 
 
+    # prints directional commands
     def print_commands(self):
         print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./logout. Type ./help for more info.")
 
+
+    # disconnect from server
     def disconnect(self):
         self.logout()
         print("\nDisconnected from server.")
         exit(0)
 
 
-        
+    # get double-hashed password from an already hashed password
+    def get_hashed_password(self, password):
+        h = blake2b(key=CLIENT_KEY, digest_size=16)
+        h.update(password.encode(FORMAT))
+        return h.hexdigest()
+
 
     # communicate with server loop
     def communicate_with_server(self):
@@ -262,12 +271,6 @@ class Client:
             except Exception as e:
                 print(e)
                 self.disconnect()
-
-    # get hashed password
-    def get_hashed_password(self, password):
-        h = blake2b(key=CLIENT_KEY, digest_size=16)
-        h.update(password.encode(FORMAT))
-        return h.hexdigest()
     
 
 if __name__ == '__main__':
