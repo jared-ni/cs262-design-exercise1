@@ -66,6 +66,9 @@ __./list *__: lists all users registered in the server; * is the text wildcard
 
 **./help**: lists these above commands in case user forgets
 
+If the user receives a message from another user, it will show up on the user's 
+terminal in the format **([\<username\>] \<message\>)**.
+
 
 ## Running Unit Tests
 For testing socket implementation (part 1), open up a terminal and nagivate to the 

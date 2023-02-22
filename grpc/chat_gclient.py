@@ -5,6 +5,8 @@ import chat_pb2_grpc as rpc
 import time 
 from hashlib import blake2b
 
+# Generate grpc server code by running 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto'
+
 address = 'localhost'
 port = 43210
 CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
