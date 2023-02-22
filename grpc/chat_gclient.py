@@ -5,7 +5,8 @@ import chat_pb2_grpc as rpc
 import time 
 from hashlib import blake2b
 
-# Generate grpc server code by running 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto'
+# Generate grpc server code by running 
+# 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto'
 
 address = 'localhost'
 port = 43210
@@ -46,8 +47,12 @@ class Client:
 
         # get server response and print error message if unsuccessful
         response = self.conn.SendNote(n)
+        print("send response: ")
+        print(response)
         if not response.success:
             print(response.message)
+            return False
+        return True
     
 
     # register user
@@ -66,15 +71,15 @@ class Client:
                 if password != re_password:
                     print("Passwords do not match.")
                     continue
-                # TODO: Hash password
-                # AccountInfo
+
                 n = chat.AccountInfo()
                 n.username = username
                 n.password = self.get_hashed_password(password)
                 response = self.conn.CreateAccount(n)
-                print("response: ")
-                print(response)
+                print("response register: ")
+                print(response.success)
                 if response.success:
+                    print(f"Successfully registered user {username}")
                     return True
                 return False
             elif register.lower() == 'no':
@@ -97,8 +102,8 @@ class Client:
                 n.password = self.get_hashed_password(password)
                 response = self.conn.Login(n)
 
-                print("login")
-                print(response)
+                print("login: ")
+                print(response.success)
                 if response.success:
                     self.username = username
                     return True
@@ -140,11 +145,14 @@ class Client:
             n.username = self.username
         n.password = input(f"Password for account {n.username}: ")
         n.password = self.get_hashed_password(n.password)
-        response = self.conn.DeleteAccount(n)
 
-        if response.success and n.username == self.username:
-            self.username = ""
-        print(response.message)
+        for response in self.conn.DeleteAccount(n):
+            if response.success and n.username == self.username:
+                self.username = ""
+                print("Account deleted. You have been logged out.")
+            else:
+                print(f"Account {n.username} has been deleted.")
+            break
 
 
     # communicate with server loop

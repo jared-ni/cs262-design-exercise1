@@ -5,6 +5,7 @@ import grpc
 import chat_pb2 as chat
 import chat_pb2_grpc as rpc
 import chat_gclient
+import time
 
 class ChatServerTest(unittest.TestCase):
     @classmethod
@@ -15,53 +16,67 @@ class ChatServerTest(unittest.TestCase):
 
     # logout user
     @mock.patch('chat_gclient.input', create=True)
-    def test_logout_user(self):
-        self.client.logout_user()
+    def test_logout(self, mocked_input):
+        self.client.logout()
         self.assertEqual(self.client.username, "")
-        print("user: " + self.client.username)
     
     # delete user1 for testing purposes
+    @mock.patch('chat_gclient.input', create=True)
+    def test_delete_account(self, mocked_input):
+        mocked_input.side_effect = ["password1"]
+        self.client.delete_account("user1")
 
+    # test sending message without logging in
+    @mock.patch('chat_gclient.input', create=True)
+    def test_send_message(self, mocked_input):
+        mocked_input.side_effect = ["user1", "Test message 1"]
 
-    # # test sending message without logging in
-    # @mock.patch('chat_gclient.input', create=True)
-    # def test_send_message(self, mocked_input):
-    #     mocked_input.side_effect = ["user1", "Test message 1"]
-    #     n = chat.Note()
-    #     n.version = 1
-    #     n.operation_code = 0
-    #     n.sender = "user1"
-    #     n.receiver = "user1"
-    #     n.message = "Test Message 1"
-    #     response = self.conn.SendNote(n)
-    #     self.assertEqual(response.success, False)
-    #     self.assertEqual(response.message, "[SERVER] You are not logged in")
+        self.client.logout()
+        success = self.client.send_message("user1", "Test message 1")
+        self.assertEqual(success, False)
 
-
-    # test register
+    # test register and login and send message
     @mock.patch('chat_gclient.input', create=True)
     def test_register_user(self, mocked_input):
-        mocked_input.side_effect = ["yes", "user1", "password1", "password1"]
-        self.client.register_user()
-        print("???")
-        print(self.client.username)
-        self.assertEqual(self.client.username, "")
-    
-    # test register
-    @mock.patch('chat_gclient.input', create=True)
-    def test_register_user2(self, mocked_input):
-        mocked_input.side_effect = ["yes", "user1", "password1", "password1"]
+        mocked_input.side_effect = ["password1",
+                                    "yes", "user1", "password1", "password1", 
+                                    "yes", "user1", "password1", "password1",
+                                    "yes", "user1", "password1", 
+                                    "yes", "user1", "password1", 
+                                    "yes", "user1", "wrongpassword"]
+        # first delete account
+        self.client.delete_account("user1")
+        # then register
         result = self.client.register_user()
+        self.assertEqual(result, True)
+        # then register again using the same username
+        result = self.client.register_user()
+        print("result: " + str(result))
         self.assertEqual(result, False)
-    
-    # test login
-    @mock.patch('chat_gclient.input', create=True)
-    def test_login_user(self, mocked_input):
-        mocked_input.side_effect = ["yes", "user1", "password1"]
+
+        # then login
         result = self.client.login_user()
-        # self.assertEqual(result, True)
-        self.assertEqual(self.client.username, "user1")
-    
+        self.assertEqual(result, True)
+
+        # then login again using the same username
+        result = self.client.login_user()
+        self.assertEqual(result, True)
+
+        # then login with wrong password
+        result = self.client.login_user()
+        self.assertEqual(result, False)
+
+        # test send message
+        success = self.client.send_message("user1", "Test message 1")
+        self.assertEqual(success, True)
+
+        # test send message to non-existent user
+        success = self.client.send_message("user2", "Test message 2")
+        self.assertEqual(success, False)
+
+    # test send message
+    # @mock.patch('chat_gclient.input', create=True)
+
 
 
 

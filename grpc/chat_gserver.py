@@ -151,16 +151,26 @@ class ChatServer(rpc.ChatServerServicer):
         print("request: ")
         print(request)
         if request.username not in self.users:
+            print("!!")
             return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
         # Check if the password is correct
-        if self.check_password(request.password, self.users[request.username]['password']):
+        if not self.check_password(request.password, self.users[request.username]['password']):
+            print("!!!!!")
             return chat.ServerResponse(success=False, message=f"[SERVER] Incorrect password for account {request.username}")
         # Delete the account
-        if self.clients[context.peer()].lower() == request.username.lower():
+        yield chat.ServerResponse(success=True, message="")
+        print("test")
+            
+        prev_client = self.users[request.username]["client"]
+        if prev_client is not None:
+            detection = chat.Note(message = f"Logged out: account {request.username} has been deleted.")
+            with self.users_lock:
+                self.users[request.username]["unread"].append(detection)
             with self.clients_lock:
-                del self.clients[context.peer()]
+                self.clients[prev_client] = None
         with self.users_lock:
             del self.users[request.username]
+
         return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} deleted")
 
 
