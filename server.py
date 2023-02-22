@@ -2,6 +2,7 @@ import threading
 import socket
 import time
 import bcrypt
+import errno
 from collections import deque
 
 PORT = 48789
@@ -62,7 +63,10 @@ def send(client, msg, operation_code):
     # 3. header length 
     header_length = (1 + len(version) + len(operation) + len(message_length)).to_bytes(1, BYTE_ORDER)
     # 5. send message
-    client.send(version + operation + header_length + message_length + message)
+    try: 
+        client.send(version + operation + header_length + message_length + message)
+    except ConnectionResetError or BrokenPipeError:
+        return
 
 
 # hash password again: server side encryption
@@ -96,7 +100,7 @@ def handle_register(client, payload):
                 "unread": deque()
             }
         send(client, f"Successfully registered {username}!", REGISTER)
-    except ValueError:
+    except ValueError or IndexError or BrokenPipeError:
         return
     
 
@@ -144,6 +148,8 @@ def handle_login(client, payload):
     
 
 # handle sending messages between two users
+# send message to receiver immediately if they are logged in
+# adds message to receiver's unread array if receiver is not logged in
 def handle_send(client, payload):
     # check if sender is logged in
     if client not in clients:
@@ -164,15 +170,19 @@ def handle_send(client, payload):
     if receiver not in users:
         send(client, f"User {receiver} does not exist!", SERVER_MESSAGE)
         return
+    
+    # send message to receiver
+    try:
+        with users_lock:
+            receiver_socket = users[receiver]["client"]
+            if not users[receiver]["logged_in"]:
+                users[receiver]["unread"].appendleft(f"{clients[client]}~:>{message}")
+            else:
+                send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
 
-    # send message to receiver immediately if they are logged in
-    # adds message to receiver's unread array if receiver is not logged in
-    with users_lock:
-        receiver_socket = users[receiver]["client"]
-        if not users[receiver]["logged_in"]:
-            users[receiver]["unread"].appendleft(f"{clients[client]}~:>{message}")
-        else:
-            send(receiver_socket, f"{clients[client]}~:>{message}", RECEIVE)
+    except KeyError or TypeError or AttributeError or BrokenPipeError:
+        send(client, f"Please check the format of your message. Type ./help for help. ", SERVER_MESSAGE)
+        return
 
 
 # handles unread messages by sending them to the client
@@ -186,9 +196,15 @@ def handle_unread(client):
     # send unread messages to client
     with users_lock:
         while users[username]["unread"]:
-            message = users[username]["unread"].pop()
-            send(client, message, RECEIVE)
-    return True
+            try: 
+                message = users[username]["unread"].pop()
+                send(client, message, RECEIVE)
+            except IOError as e:
+                if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
+                    continue
+            except BrokenPipeError:
+                break
+    return
 
 
 # print out all users registered with text wildcard
@@ -213,55 +229,59 @@ def handle_list(client, payload):
 
 # delete current user's account
 def handle_delete(client, payload):
-    username, password = payload.split("~:>")
-    print("username: ", username)
-    print("password: ", password)
-    if not username and client in clients:
-        print("!")
-        username = clients[client]
-    if not username or username not in users:
-        print("!!")
-        send(client, f"Account {username} does not exist!", SERVER_MESSAGE)
-        return
-    if not check_password(password, users[username]["password"]):
-        print("!!!")
-        send(client, f"Incorrect password for account {username}!", SERVER_MESSAGE)
-        return
-    else:
-        # if deleting current client's account, log them out
-        if client in clients and clients[client] == username:
-            send(client, f":::", DELETE)
-        print(clients)
-        print(users)
+    try: 
+        username, password = payload.split("~:>")
+        if not username and client in clients:
+            print("!")
+            username = clients[client]
+        if not username or username not in users:
+            print("!!")
+            send(client, f"Account {username} does not exist!", SERVER_MESSAGE)
+            return
+        if not check_password(password, users[username]["password"]):
+            print("!!!")
+            send(client, f"Incorrect password for account {username}!", SERVER_MESSAGE)
+            return
+        else:
+            # if deleting current client's account, log them out
+            if client in clients and clients[client] == username:
+                send(client, f":::", DELETE)
 
-        with clients_lock:
-            deleted_client = users[username]["client"]
-            if deleted_client is not None:
-                send(deleted_client, f"Logged out: Account {username}", DELETE)
-                del clients[deleted_client]
-        with users_lock:
-            del users[username]
-        
-        print(clients)
-        print(users)
-    
-        send(client, f"Successfully deleted user {username}", DELETE)
+            # log out of the deleted_user's client
+            with clients_lock:
+                deleted_client = users[username]["client"]
+                if deleted_client is not None:
+                    send(deleted_client, f"Logged out: Account {username}", DELETE)
+                    del clients[deleted_client]
+            # actually deleting the user
+            with users_lock:
+                del users[username]
+            send(client, f"Successfully deleted user {username}", DELETE)
+
+    except Exception as e:
+        print(e)
+        send(client, f"Syntax for deleting an account: ./delete <username>", SERVER_MESSAGE)
 
 
 # handle disconnect
 def handle_disconnect(client):
+    # check if user is logged in
     if client not in clients:
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
+    # deleting client from clients dictionary
+    try: 
+        username = clients[client]
+        with users_lock:
+            if username and username in users:
+                users[username]["client"] = None
+                users[username]["logged_in"] = False
+                del clients[client]
+        send(client, "[CLIENT DISCONNECTED]", DISCONNECT)
     
-    username = clients[client]
-    with users_lock:
-        if username and username in users:
-            users[username]["client"] = None
-            users[username]["logged_in"] = False
-            del clients[client]
-
-    send(client, "[CLIENT DISCONNECTED]", DISCONNECT)
+    except ValueError or KeyError or Exception as e:
+        print(e)
+        return
 
 
 # handle client in separate thread
@@ -269,9 +289,9 @@ def handle_client(conn, addr):
     print(f"[NEW CONNECTION] {addr} connected.")
     with clients_lock:
         clients[conn] = None
-    try: 
-        connected = True
-        while connected:
+
+    while True:
+        try: 
             # parse wired protocol header
             # 1. client version number must match server version number
             version = int.from_bytes(conn.recv(p_sizes["ver"]), BYTE_ORDER)
@@ -306,10 +326,15 @@ def handle_client(conn, addr):
             elif operation == UNREAD:
                 handle_unread(conn)
             elif operation == DISCONNECT:
-                raise Exception
-    except:
-        print(f"[{addr}] disconnected.")
-        handle_disconnect(conn)
+                handle_disconnect(conn)
+
+        # handle recoverable errors
+        except IOError as e:
+            if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
+                continue
+        except:
+            print(f"[{addr}] disconnected.")
+            handle_disconnect(conn)
 
 
 # handle clients
