@@ -65,3 +65,11 @@ TODOS:
 - Checked error handling and handle version number checking.
 
 ## Part 2 (gRPC)
+2/21:
+- For the gRPC portion of the assignment, most of the code and functionality from part 1 was carried over with grpc protocols instead of our own defined wire protocols. 
+
+- In terms of the complexity of our code, the gRPC abstracted away major parts of the implementation, such as the use of threads, streaming, and asychronous call and response. Thus, the gRPC implementation was much simpler (especially for the programmer).
+
+- For performance differernces, it'm important to note that for the socket implementation, call and responses from client to server was slow because any message sent from client to server (such as registering and logging in) had to have their reponse picked up by the client's listening thread. So the response was not immediate. Because gRPC handles birdirectional streaming, in instances where a server sends a response back to the client, these were much more faster compared to our socket/wire protocol implementation. For sending messages from a client to another client, we did not notice any big differences in performance.
+
+- For the size of the buffers, based on our implementation, the size for grpc buffers are at least the size of the buffers from our own wire protocol.
