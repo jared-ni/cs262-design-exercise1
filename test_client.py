@@ -78,7 +78,7 @@ class TestClient(TestCase):
 
         mocked_input.side_effect = ["yes", "user1", "1", "yes", "1"]
         client.login_user(client_test)
-        client.delete_user(client_test)
+        client.delete_user(client_test, "user1")
         result = client.listen_from_server(client_test, [True])
         client_test.close()
         self.assertEqual(result, True)
@@ -90,8 +90,8 @@ class TestClient(TestCase):
 
         mocked_input.side_effect = ["yes", "user1", "1", "yes", "2", "no"]
         client.login_user(client_test)
-        client.delete_user(client_test)
-        client.delete_user(client_test)
+        client.delete_user(client_test, "user1")
+        client.delete_user(client_test, "user1")
         result = client.listen_from_server(client_test, [True])
         client_test.close()
         self.assertEqual(result, True)
@@ -101,21 +101,10 @@ class TestClient(TestCase):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_test.connect((socket.gethostbyname(socket.gethostname()), 48789))
 
-        mocked_input.side_effect = ["yes"]
-        client.disconnect_client(client_test)
-        result = client.listen_from_server(client_test, [True])
+        with self.assertRaises(SystemExit) as cm:
+            client.disconnect_client(client_test)
         client_test.close()
-        self.assertEqual(result, False)
-
-    @mock.patch('client.input', create=True)
-    def test_disconnect2(self, mocked_input):
-        client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_test.connect((socket.gethostbyname(socket.gethostname()), 48789))
-
-        mocked_input.side_effect = ["no"]
-        result = client.disconnect_client(client_test)
-        client_test.close()
-        self.assertEqual(result, False)
+        self.assertEqual(cm.exception.code, 0)
 
     @mock.patch('client.input', create=True)
     def test_forced_disconnect1(self, mocked_input):
