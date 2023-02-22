@@ -181,7 +181,8 @@ if __name__ == '__main__':
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10)) 
     rpc.add_ChatServerServicer_to_server(ChatServer(), server)
     print('[SERVER STARTING] Listening on port ' + str(port) + '...')
-    server.add_insecure_port('localhost:' + str(port))
+
+    server.add_insecure_port('10.250.151.166:' + str(port))
     server.start()
 
     server.wait_for_termination()

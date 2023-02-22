@@ -4,12 +4,13 @@ import chat_pb2 as chat
 import chat_pb2_grpc as rpc
 import time 
 from hashlib import blake2b
+import sys
+import errno
+import signal
 
 # Generate grpc server code by running 
 # 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto'
 
-address = 'localhost'
-port = 43210
 CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
 FORMAT = "utf-8"
 
@@ -18,8 +19,29 @@ class Client:
     def __init__(self):
         # the frame to put ui components on
         self.username = ""
+        self.address = 'localhost'
+        self.port = 43210
+
+        # configure server address, if on Jared's Mac, try 10.250.151.166, or 10.250.0.1
+        try:
+            while True:
+                response = input("Is the server on this machine? (yes/no) ")
+                if response.lower() == 'yes':
+                    break
+                elif response.lower() == 'no':
+                    if len(sys.argv) != 2:
+                        print(sys.argv)
+                        print("Usage: python3 chat_gclient.py <host>")
+                        return
+                    self.address = sys.argv[1]
+                    break
+        except KeyboardInterrupt:
+            print("\n[DISCONNECTED]")
+            exit(0)
+
         # create a gRPC channel + stub
-        channel = grpc.insecure_channel(address + ':' + str(port))
+        addr = str(self.address) + ":" + str(self.port)
+        channel = grpc.insecure_channel(addr)
         self.conn = rpc.ChatServerStub(channel)
 
     
@@ -33,7 +55,7 @@ class Client:
 
     def __listen_for_messages(self):
         for note in self.conn.ChatStream(chat.Empty()):
-            print("R[{}] {}".format(note.sender, note.message))
+            print(">[{}] {}".format(note.sender, note.message))
 
 
     # send message to server then to receiver
@@ -65,6 +87,10 @@ class Client:
                 if not username:
                     print("Username cannot be empty.")
                     continue
+                # check if username contains ':'
+                if ":" in username:
+                    print("Username cannot contain ':'")
+                    continue
                 password = input("Password: ")
 
                 re_password = input("Re-enter password: ")
@@ -76,10 +102,8 @@ class Client:
                 n.username = username
                 n.password = self.get_hashed_password(password)
                 response = self.conn.CreateAccount(n)
-                print("response register: ")
-                print(response.success)
+                print(response.message)
                 if response.success:
-                    print(f"Successfully registered user {username}")
                     return True
                 return False
             elif register.lower() == 'no':
@@ -150,52 +174,91 @@ class Client:
             if response.success and n.username == self.username:
                 self.username = ""
                 print("Account deleted. You have been logged out.")
-            else:
+                return True
+            elif response.success:
                 print(f"Account {n.username} has been deleted.")
-            break
+                return True
+            else:
+                return False
+        return False
+    
 
+    # prints out the help menu
+    def print_help(self):
+        print("Commands:")
+        print("\t./list: list all users,")
+        print("\t./register: register a new account,")
+        print("\t./login: log in to an existing account,")
+        print("\t./delete <user>: delete account <user> (<user> = current user by default),")
+        print("\t./disconnect: disconnect from the server,")
+        print("\t<user>: <message>: send a message to a user.")
+
+
+    def print_commands(self):
+        print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./disconnect. Type ./help for more info.")
+
+    def disconnect(self):
+        self.logout()
+        print("\nDisconnected from server.")
+        exit(0)
+
+
+        
 
     # communicate with server loop
     def communicate_with_server(self):
+        # handle ctrl-z and ctrl-c
+        signal.signal(signal.SIGTSTP, lambda x, y: self.disconnect())
+        signal.signal(signal.SIGINT, lambda x, y: self.disconnect())
+
         # register user
         self.register_user()
         # login user
         logged_in = self.login_user()
-        if logged_in:
-            # TODO: self.load_unread()
-            pass
+        # unread is automatically loaded when user logs in
+        
         while True:
-            message = input()
-            if not message:
-                continue
-            elif message[:8].lower() == "./delete":
-                self.delete_account(message[8:].strip().lower())
-            elif message.lower() == "./help":
-                # print_help()
-                pass
-            elif message[:6].lower() == "./list":
-                # TODO: MAGIC WORD
-                self.list_accounts(message[7:].strip().lower())
-            elif message.lower() == "./register":
-                successful = self.register_user()
-                time.sleep(0.5)
-                if not successful:
-                    self.register_user()
-                # if not logged in and registered, login
-                elif not self.username and successful:
-                    self.login_user()
-            elif message.lower() == "./login":
-                self.login_user()
-            elif message.lower() == "./logout":
-                self.logout()
-            else:
-                firstColon = message.find(':')
-                if firstColon == -1:
-                    print("Use: <user>: <message>")
+            try: 
+                message = input()
+                if not message:
                     continue
-                user = message[:firstColon]
-                message = message[firstColon + 1:]
-                self.send_message(user, message)
+                elif message[:8].lower() == "./delete":
+                    self.delete_account(message[8:].strip().lower())
+                elif message.lower() == "./help":
+                    # print_help()
+                    pass
+                elif message[:6].lower() == "./list":
+                    # TODO: MAGIC WORD
+                    self.list_accounts(message[7:].strip().lower())
+                elif message.lower() == "./register":
+                    successful = self.register_user()
+                    time.sleep(0.5)
+                    if not successful:
+                        self.register_user()
+                    # if not logged in and registered, login
+                    elif not self.username and successful:
+                        self.login_user()
+                elif message.lower() == "./login":
+                    self.login_user()
+                elif message.lower() == "./logout":
+                    self.logout()
+                else:
+                    firstColon = message.find(':')
+                    if firstColon == -1:
+                        print("Use: <user>: <message>")
+                        continue
+                    user = message[:firstColon]
+                    message = message[firstColon + 1:]
+                    self.send_message(user, message)
+            except IOError as e:
+                # ignore recoverable EAGAIN and EWOULDBLOCK error
+                if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
+                    continue
+                print('Reading error', str(e))
+                self.disconnect()
+            except Exception as e:
+                print(e)
+                self.disconnect()
 
     # get hashed password
     def get_hashed_password(self, password):
