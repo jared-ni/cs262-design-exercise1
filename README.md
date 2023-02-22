@@ -24,7 +24,7 @@ where <host> is the address of the machine the server is currently running on.
 If multiple clients want to connect, repeat the above step in another terminal.
 
 
-## Setting up Server and Client(s) (Part 2: Python GRPC)
+## Setting up Server and Client(s) (Part 2: Python gRPC)
 Open a terminal, nagivate to the grpc directory with chat_gserver.py and chat_gclient.py, and run the server by typing 
 ```bash
 python chat_gserver.py
