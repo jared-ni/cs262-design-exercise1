@@ -37,9 +37,9 @@ python chat_gclient.py
 ```
 Else, if the server is running on a different machine as the client, run
 ```bash
-python chat_gclient.py <host>
+python chat_gclient.py {host}
 ```
-where <host> is the address of the machine the server is currently running on.
+where {host} is the address of the machine the server is currently running on.
 
 If multiple clients want to connect, repeat the above step in another terminal.
 
