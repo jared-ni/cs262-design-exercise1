@@ -32,44 +32,36 @@ TODOS:
     - should we have a buffer in front of each actual message, so we know for sure that we are parsing the actual message? 
 
 - How should I abstract the code for registering and logging in? Should they be part of the while loop that handles incoming wired protocol messages? 
-- My thoughts on client side structure: 
-    - After connecting, asks user whether they want to register. Then, ask them to log in. Whenever they want to register or login another account, they may do so with commands. 
-    - After register/login, user enters while loop, where it follows the structure for server side socket.
+- For the client side structur, after connecting, it asks user whether they want to register. Then, it asks them to log in. Whenever they want to register or login another account, they may do so with commands. This is the natural sequence for registering for any chat app. After register/login, user enters while loop, where it follows the structure for server side socket.
 
-- We need a response message, in case the message failed to deliver. 
+- We implemented a response message from server to client, in case the message failed to deliver. 
 
-- Fixed a huge design flaw. For context, we have two different threads, one for listening and one for user input. The listening thread and the input threads are not supposed to interact, so it doesn't matter what the results of functions are. We simply send the message, and if they fail, we throw fail message on the listening thread. It's okay if they fail, because the client can simply call them again. It doesn't have to repeatedly ask the server for response when creating a new account, because we can simply call the register_user function on demand. Every loop, we check whether the user is logged in, and if they are not, we ask them to sign in, and if they refuse, we deny them any user-level commands like sending messages. 
+- We fixed a huge design flaw. For context, we have two different threads, one for listening and one for user input. The listening thread and the input threads are not supposed to interact, so it doesn't matter what the results of functions are. We simply send the message, and if they fail, we throw fail message on the listening thread. It's okay if they fail, because the client can simply call them again. It doesn't have to repeatedly ask the server for response when creating a new account, because we can simply call the register_user function on demand. Every loop, we check whether the user is logged in, and if they are not, we ask them to sign in, and if they refuse, we deny them any user-level commands like sending messages. From what we had before, our client was entering more and more infinite loops which was causing later functions to fail.
 
 2/13
-- Handled edge cases. 
-- First, if the client deletes its user its logged in as, it prompts the client to register another account.
-- Second, if the client says "no" to registration, the client is prompted to log in to an account.
-- Third, if the client says "no" to logging in, the client is prompted to register another account.
-- Added a new option for users to immediately disconnect from the register and login prompts.
+- Handled edge cases:
+    - First, if the client deletes its user its logged in as, it prompts the client to register another account.
+    - Second, if the client says "no" to registration, the client is prompted to log in to an account.
+    - Third, if the client says "no" to logging in, the client is prompted to register another account.
+    - Added a new option for users to immediately disconnect from the register and login prompts.
 
 2/17: 
-- Deliver unread messages on login by implementing a queue inside each user struct for unread messages
+- Deliver unread messages on login by implementing a queue inside each user struct for unread messages that are sent when users log in.
 - Locked all dictionaries with mutex such that only one user can access and change the client and user dictionaries at a given moment.
 - Add constraints to username (can't contain :, as that would inferere with the client protocol to send messages)
-- Added better, more helpful error messages
+- Added better, more helpful error messages for clients to understand
 - Do we want a trie in order to make text wildcard efficient when searching for user accounts?
-
 
 2/19: 
 - Error handling with wrong key inputs
 - Handle client disconnection from forced control + z and control + c
 
-
 2/19: 
-- Still need to add multiple-people features. 
-- Need to encrypt messages. 
-
-- Delete doesn't actually log poeople out!!!!!
-
-- log one client out when another client is logged in
-
+- Double encrypted passwords from client to server and from server to dictionary storing user info. 
+- Fixed bug where delete doesn't actually log poeople out.
+- Logged one client out when another client is logged in as a user
 
 2/21: 
-- Need to: check error handling, handle version number checking, handle everything else
+- Checked error handling and handle version number checking.
 
 ## Part 2 (gRPC)
