@@ -1,9 +1,56 @@
 # cs262-design-exercise1
 
-Team: Jared Ni, Bryan Han
+"gives a set of instructions on setting up the client and server so that the system can be run"
 
-This is a distributed chat application that runs on Python Sockets. 
+# Installation
+```bash
+pip install -r requirements.txt 
+```
 
+# Setting up Server and Client(s) (Part 1: Python Sockets)
+Open a terminal, nagivate to the directory with server.py and client.py, and run the server by typing 
+```bash
+python server.py
+```
+
+Then, open another terminal in the same directory. If the server is running on the same machine, type
+```bash
+python client.py
+```
+Else, if the server is running on a different machine as the client, run
+```bash
+python client.py <host>
+```
+where <host> is the address of the machine the server is currently running on.
+
+If multiple clients want to connect, repeat the above step in another terminal.
+
+# Setting up Server and Client(s) (Part 2: Python GRPC)
+Open a terminal, nagivate to the grpc directory with chat_gserver.py and chat_gclient.py, and run the server by typing 
+```bash
+python chat_gserver.py
+```
+
+Then, open another terminal in the same directory. If the server is running on the same machine, type
+```bash
+python chat_gclient.py
+```
+Else, if the server is running on a different machine as the client, run
+```bash
+python chat_gclient.py <host>
+```
+where <host> is the address of the machine the server is currently running on.
+
+If multiple clients want to connect, repeat the above step in another terminal.
+
+# Navigating the Chat App
+For both sockets and GRPC implementations, once the client connects to the server, 
+the chat app prompts you to register for a user. If the client already is a 
+registered user, then it can simply type "no". Then, chat app then prompts you 
+to log in. Afterwards, the user has access to all 
+
+# Running Unit Tests
+For 
 
 python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto
 

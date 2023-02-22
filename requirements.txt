@@ -1,0 +1,4 @@
+protobuf==4.22.0
+bcrypt==4.0.1
+setuptools==45.2.0
+grpcio==1.51.1
