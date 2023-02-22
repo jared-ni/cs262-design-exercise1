@@ -44,8 +44,16 @@ class ChatServer(rpc.ChatServerServicer):
 
     # Send a message to the server then to the receiver
     def SendNote(self, request: chat.Note, context):
-        current_user = self.clients[context.peer()]
-        if not current_user:
+        print(request)
+        # check version
+        if request.version != 1:
+            return chat.ServerResponse(success=False, message="[SERVER] Version mismatch")
+        
+        current_user = None
+        if context.peer() in self.clients:
+            current_user = self.clients[context.peer()]
+
+        if current_user is None or not current_user:
             return chat.ServerResponse(success=False, message="[SERVER] You are not logged in")
 
         # Check if the receiver exists

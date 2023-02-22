@@ -90,8 +90,8 @@ class TestClient(TestCase):
 
         mocked_input.side_effect = ["yes", "user1", "1", "yes", "2", "no"]
         client.login_user(client_test)
-        client.delete_user(client_test, "user1")
-        client.delete_user(client_test, "user1")
+        client.delete_user(client_test, "", "user1")
+        client.delete_user(client_test, "", "user1")
         result = client.listen_from_server(client_test, [True])
         client_test.close()
         self.assertEqual(result, True)
