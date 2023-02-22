@@ -4,29 +4,12 @@ import unittest
 import client
 import socket
 
-# 1. version
-VERSION = 1
-# 2. operation_codes
-REGISTER = 1
-LOGIN = 2
-LIST = 3
-DELETE = 4
+# operation_code
 SEND = 5
-RECEIVE = 6
-SERVER_MESSAGE = 7
-UNREAD = 8
-DISCONNECT = 9
-defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, UNREAD, DISCONNECT])
-p_sizes = {
-    "ver": 1,
-    "op": 1,
-    "h_len": 1,
-    "m_len": 2
-}
-CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
 
 class TestClient(TestCase):
 
+    # tests register_user registers user
     @mock.patch('client.input', create=True)
     def test_register1(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -38,6 +21,7 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(result, True)
 
+    # tests register_user correctly behaves for "no"
     @mock.patch('client.input', create=True)
     def test_register2(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -48,6 +32,7 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(result, False)
 
+    # tests login_user logs in already registered user
     @mock.patch('client.input', create=True)
     def test_login1(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -59,6 +44,7 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(result, True)
 
+    # tests login_user for works for "no"
     @mock.patch('client.input', create=True)
     def test_login2(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -71,6 +57,7 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(result, True)
 
+    # tests deletet_user correcetly deletes user from list of users
     @mock.patch('client.input', create=True)
     def test_delete1(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -83,6 +70,7 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(result, True)
 
+    # tests delete_user does not delete user given wrong password
     @mock.patch('client.input', create=True)
     def test_delete2(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -90,12 +78,13 @@ class TestClient(TestCase):
 
         mocked_input.side_effect = ["yes", "user1", "1", "yes", "2", "no"]
         client.login_user(client_test)
-        client.delete_user(client_test, "", "user1")
-        client.delete_user(client_test, "", "user1")
+        client.delete_user(client_test, "user1")
+        client.delete_user(client_test, "user1")
         result = client.listen_from_server(client_test, [True])
         client_test.close()
         self.assertEqual(result, True)
 
+    # tests disconnect_client corectly raises the SystemExit error
     @mock.patch('client.input', create=True)
     def test_disconnect1(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -106,6 +95,7 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(cm.exception.code, 0)
 
+    # tests forced_disconnect corectly raises the SystemExit error
     @mock.patch('client.input', create=True)
     def test_forced_disconnect1(self, mocked_input):
         client_test = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -116,6 +106,7 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(cm.exception.code, 0)
 
+    # tests that message is properly received from one client to another
     @mock.patch('client.input', create=True)
     def test_send(self, mocked_input):
         client_test1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
