@@ -4,7 +4,7 @@ package grpc;
 
 message Empty {}
 
-// I called it Note because message Message is annoying to work with
+// denotes a message that is sent between 2 users
 message Note {
 	int32 version = 1;
 	int32 operation_code = 2;
@@ -13,18 +13,21 @@ message Note {
     string message = 5;
 }
 
+// denotes a response from the server
 message ServerResponse {
 	bool success = 1;
 	string message = 2;
 }
 
+// denotes a request to creating or logging in an account
 message AccountInfo {
 	string username = 1;
 	string password = 2;
 }
 
+// The ChatServer service definition.
 service ChatServer {
-    // This bi-directional stream makes it possible to send and receive Notes between 2 persons
+    // bi-directional stream for chat streaming between server and client
     rpc ChatStream (Empty) returns (stream Note);
     rpc SendNote (Note) returns (ServerResponse);
 	// account creation
