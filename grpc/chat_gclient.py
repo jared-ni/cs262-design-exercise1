@@ -10,7 +10,7 @@ import signal
 import socket
 
 # Generate grpc server code by running 
-# 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto'
+# 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/chat.proto'
 
 CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
 FORMAT = "utf-8"
@@ -71,8 +71,6 @@ class Client:
 
         # get server response and print error message if unsuccessful
         response = self.conn.SendNote(n)
-        print("send response: ")
-        print(response)
         if not response.success:
             print(response.message)
             return False
@@ -129,6 +127,7 @@ class Client:
                 response = self.conn.Login(n)
 
                 print(response.message)
+                self.print_commands()
                 if response.success:
                     self.username = username
                     return True
@@ -142,9 +141,10 @@ class Client:
     def logout(self):
         n = chat.Empty()
         response = self.conn.Logout(n)
+        print(response.message)
         if response.success:
             self.username = ""
-        # print(response.message)
+
 
 
     # list accounts
@@ -172,31 +172,33 @@ class Client:
         n.password = self.get_hashed_password(n.password)
 
         for response in self.conn.DeleteAccount(n):
-            if response.success and n.username == self.username:
+            print(response.message)
+            if not response.success:
+                print("Account deletion failed.")
+                return False
+            elif response.success and n.username == self.username:
                 self.username = ""
                 print("Account deleted. You have been logged out.")
                 return True
             elif response.success:
                 print(f"Account {n.username} has been deleted.")
                 return True
-            else:
-                return False
         return False
     
 
     # prints out the help menu
     def print_help(self):
         print("Commands:")
-        print("\t./list: list all users,")
+        print("\t./list <user>: list all users if <user> is empty, else list all users that contain <user>,")
         print("\t./register: register a new account,")
         print("\t./login: log in to an existing account,")
         print("\t./delete <user>: delete account <user> (<user> = current user by default),")
-        print("\t./disconnect: disconnect from the server,")
-        print("\t<user>: <message>: send a message to a user.")
+        print("\t./logout: disconnect from the server,")
+        print("\t<user>: <message>: send a message to <user>.")
 
 
     def print_commands(self):
-        print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./disconnect. Type ./help for more info.")
+        print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./logout. Type ./help for more info.")
 
     def disconnect(self):
         self.logout()
@@ -226,7 +228,7 @@ class Client:
                 elif message[:8].lower() == "./delete":
                     self.delete_account(message[8:].strip().lower())
                 elif message.lower() == "./help":
-                    # print_help()
+                    self.print_help()
                     pass
                 elif message[:6].lower() == "./list":
                     # TODO: MAGIC WORD

@@ -7,6 +7,7 @@ from collections import deque
 import threading
 import bcrypt
 import socket
+import errno
 
 
 class ChatServer(rpc.ChatServerServicer):
@@ -33,103 +34,121 @@ class ChatServer(rpc.ChatServerServicer):
         # For every client a infinite loop starts (in gRPC's own managed thread)
         user = None
         while True:
-            if context.peer() in self.clients:
-                user = self.clients[context.peer()]
-            if not user:
-                continue
-            # Check if there are any new messages if logged in
-            while len(self.users[user]['unread']) > 0:
-                message = self.users[user]['unread'].popleft()
-                yield message
+            try: 
+                if context.peer() in self.clients:
+                    user = self.clients[context.peer()]
+                if not user:
+                    continue
+                # Check if there are any new messages if logged in
+                while len(self.users[user]['unread']) > 0:
+                    message = self.users[user]['unread'].popleft()
+                    yield message
+            except IOError as e:
+                # ignore recoverable EAGAIN and EWOULDBLOCK error
+                if e.errno == errno.EAGAIN and e.errno == errno.EWOULDBLOCK:
+                    continue
+            except Exception as e:
+                print(e)
+                yield chat.ServerResponse(success=False, message="[SERVER] Error sending message")
+                
 
 
     # Send a message to the server then to the receiver
     def SendNote(self, request: chat.Note, context):
-        print(request)
-        # check version
-        if request.version != 1:
-            return chat.ServerResponse(success=False, message="[SERVER] Version mismatch")
-        
-        current_user = None
-        if context.peer() in self.clients:
-            current_user = self.clients[context.peer()]
+        try: 
+            # check version
+            if request.version != 1:
+                return chat.ServerResponse(success=False, message="[SERVER] Version mismatch")
+            
+            current_user = None
+            if context.peer() in self.clients:
+                current_user = self.clients[context.peer()]
 
-        if current_user is None or not current_user:
-            return chat.ServerResponse(success=False, message="[SERVER] You are not logged in")
+            if current_user is None or not current_user:
+                return chat.ServerResponse(success=False, message="[SERVER] You are not logged in")
 
-        # Check if the receiver exists
-        if request.receiver not in self.users:
-            return chat.ServerResponse(success=False, message="[SERVER] User does not exist")
-        
-        # append to unread
-        with self.users_lock:
-            self.users[request.receiver]['unread'].append(request)
-        return chat.ServerResponse(success=True, message="")
+            # Check if the receiver exists
+            if request.receiver not in self.users:
+                return chat.ServerResponse(success=False, message="[SERVER] User does not exist")
+            
+            # append to unread
+            with self.users_lock:
+                self.users[request.receiver]['unread'].append(request)
+            return chat.ServerResponse(success=True, message="")
+        except Exception as e:
+            print(e)
+            return chat.ServerResponse(success=False, message="[SERVER] Error sending message")
     
     
     # Acount Creaton
     def CreateAccount(self, request: chat.AccountInfo, context):
-        # Check if the username is already taken
-        if request.username in self.users:
-            return chat.ServerResponse(success=False, message="[SERVER] Username already taken")
-        # Create the account
-        with self.users_lock:
-            self.users[request.username] = {
-                "password": self.hash_password(request.password), 
-                "client": None,
-                "logged_in": False,
-                "unread": deque()
-            }
-        return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} created")
+        try: 
+            # Check if the username is already taken
+            if request.username in self.users:
+                return chat.ServerResponse(success=False, message="[SERVER] Username already taken")
+            # Create the account
+            with self.users_lock:
+                self.users[request.username] = {
+                    "password": self.hash_password(request.password), 
+                    "client": None,
+                    "logged_in": False,
+                    "unread": deque()
+                }
+            return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} created")
+        except Exception as e:
+            print(e)
+            return chat.ServerResponse(success=False, message="[SERVER] Error creating account")
     
 
     # Account Login 
     # TODO: Need to fix loggin in on multiple clients
     def Login(self, request: chat.AccountInfo, context):
-        # Check if the username exists
-        if request.username not in self.users:
-            return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
-        # Check if the password is correct
-        if not self.check_password(request.password, self.users[request.username]['password']):
-            return chat.ServerResponse(success=False, message="[SERVER] Incorrect password")
-        
-        if request.username in self.users and self.users[request.username]["client"] is not None:
-            detection = chat.Note(message = f"Logged out: detected {request.username} login on another client.")
-            self.users[request.username]["unread"].append(detection)
-            # wait for previous client to get message
-            time.sleep(1)
-            prev_client = self.users[request.username]["client"]
-            with self.clients_lock:
-                self.clients[prev_client] = None
+        try: 
+            # Check if the username exists
+            if request.username not in self.users:
+                return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
+            # Check if the password is correct
+            if not self.check_password(request.password, self.users[request.username]['password']):
+                return chat.ServerResponse(success=False, message="[SERVER] Incorrect password")
             
-        # Login the user
-        self.users[request.username]['logged_in'] = True
-
-        if context.peer() in self.clients and self.clients[context.peer()] is not None:
-            prev_user = self.clients[context.peer()]
-            with self.users_lock:
-                self.users[prev_user]["logged_in"] = False
-                self.users[prev_user]["client"] = None
-        with self.clients_lock:
-            self.clients[context.peer()] = request.username
-        with self.users_lock:
-            self.users[request.username]['client'] = context.peer()
+            if request.username in self.users and self.users[request.username]["client"] is not None:
+                detection = chat.Note(message = f"Logged out: detected {request.username} login on another client.")
+                self.users[request.username]["unread"].append(detection)
+                # wait for previous client to get message
+                time.sleep(1)
+                prev_client = self.users[request.username]["client"]
+                with self.clients_lock:
+                    self.clients[prev_client] = None
+                
+            # Login the user
             self.users[request.username]['logged_in'] = True
 
-        return chat.ServerResponse(success=True, message=f"[SERVER] Logged in as {request.username}")
+            # Logout previous user
+            if context.peer() in self.clients and self.clients[context.peer()] is not None:
+                prev_user = self.clients[context.peer()]
+                with self.users_lock:
+                    self.users[prev_user]["logged_in"] = False
+                    self.users[prev_user]["client"] = None
+            # login new user
+            with self.clients_lock:
+                self.clients[context.peer()] = request.username
+            with self.users_lock:
+                self.users[request.username]['client'] = context.peer()
+                self.users[request.username]['logged_in'] = True
+            return chat.ServerResponse(success=True, message=f"[SERVER] Logged in as {request.username}")
+        
+        except Exception as e:
+            print(e)
+            return chat.ServerResponse(success=False, message="[SERVER] Error logging in")
 
 
     # Account Logout
     def Logout(self, request: chat.Empty, context):
-        print("logout")
-        print(self.clients)
-        print(self.users)
         # Check if the username exists
         if context.peer() not in self.clients or self.clients[context.peer()] is None:
             return chat.ServerResponse(success=False, message="[SERVER] You are not logged in")
         # Logout the user
         username = self.clients[context.peer()]
-
         with self.users_lock:
             self.users[username]['logged_in'] = False
             self.users[username]['client'] = None
@@ -145,34 +164,39 @@ class ChatServer(rpc.ChatServerServicer):
         for user in self.users.keys():
             if request.username == "*" or not request.username or request.username in user:
                 yield chat.ServerResponse(success=True, message=f"{user}")
-                
+
+
     # Account delete
     def DeleteAccount(self, request: chat.AccountInfo, context):
-        # Check if the username exists
-        print("request: ")
-        print(request)
-        if request.username not in self.users:
-            print("!!")
-            return chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
-        # Check if the password is correct
-        if not self.check_password(request.password, self.users[request.username]['password']):
-            print("!!!!!")
-            return chat.ServerResponse(success=False, message=f"[SERVER] Incorrect password for account {request.username}")
-        # Delete the account
-        yield chat.ServerResponse(success=True, message="")
-        print("test")
-            
-        prev_client = self.users[request.username]["client"]
-        if prev_client is not None:
-            detection = chat.Note(message = f"Logged out: account {request.username} has been deleted.")
+        try: 
+            # Check if the username exists
+            if request.username not in self.users:
+                yield chat.ServerResponse(success=False, message="[SERVER] Username does not exist")
+                return
+            # Check if the password is correct
+            if not self.check_password(request.password, self.users[request.username]['password']):
+                yield chat.ServerResponse(success=False, message=f"[SERVER] Incorrect password for account {request.username}")
+                return
+            # Delete the account
+            yield chat.ServerResponse(success=True, message="")
+                
+            # warn the currently logged in client on the deleted account
+            prev_client = self.users[request.username]["client"]
+            if prev_client is not None:
+                detection = chat.Note(message = f"Logged out: account {request.username} has been deleted.")
+                with self.users_lock:
+                    self.users[request.username]["unread"].append(detection)
+                with self.clients_lock:
+                    self.clients[prev_client] = None
             with self.users_lock:
-                self.users[request.username]["unread"].append(detection)
-            with self.clients_lock:
-                self.clients[prev_client] = None
-        with self.users_lock:
-            del self.users[request.username]
+                del self.users[request.username]
 
-        return chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} deleted")
+            yield chat.ServerResponse(success=True, message=f"[SERVER] Account {request.username} deleted")
+            return
+        except KeyError or ValueError:
+            return chat.ServerResponse(success=False, message="[SERVER] Failed: make sure information is entered correctly")
+        except Exception as e:
+            return chat.ServerResponse(success=False, message=f"[SERVER] Failed: {e}")
 
 
 # main thread for handling clients
