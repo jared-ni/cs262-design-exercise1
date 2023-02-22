@@ -60,3 +60,17 @@ My thoughts on client side structure:
 
 2/21: 
 - Need to: check error handling, handle version number checking, handle everything else
+
+Misc stuff in README:
+python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto
+
+- login(): login reply types. If you call login, it returns to the correct client. 
+
+- communicate between client: 
+    Two threads
+
+    one thread: get message from server
+
+    one thread: send message. 
+
+    to send, send to database. Whenever 
