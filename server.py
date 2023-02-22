@@ -227,10 +227,13 @@ def handle_delete(client, payload):
         send(client, f"Incorrect password for account {username}!", SERVER_MESSAGE)
         return
     else:
+        with clients_lock:
+            deleted_client = users[username]["client"]
+            send(deleted_client, f"Logged out: Account {username} has been deleted.", DELETE)
+            del clients[deleted_client]
         with users_lock:
             del users[username]
-        with clients_lock:
-            del clients[client]
+    
         send(client, f"Successfully deleted user {username}", DELETE)
 
 

@@ -56,3 +56,7 @@ My thoughts on client side structure:
 - Delete doesn't actually log poeople out!!!!!
 
 - log one client out when another client is logged in
+
+
+2/21: 
+- Need to: check error handling, handle version number checking, handle everything else
