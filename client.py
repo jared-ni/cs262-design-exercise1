@@ -30,15 +30,15 @@ RECEIVE = 6
 SERVER_MESSAGE = 7
 UNREAD = 8
 DISCONNECT = 9
-defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, SERVER_MESSAGE, UNREAD, DISCONNECT])
+# defined operations
+defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, 
+                          SERVER_MESSAGE, UNREAD, DISCONNECT])
 # wired protocol header sizes
-p_sizes = {
-    "ver": 1,
-    "op": 1,
-    "h_len": 1,
-    "m_len": 2
-}
+p_sizes = { "ver": 1, "op": 1, "h_len": 1, "m_len": 2 }
+
+# client key for client-side hashing of passwords
 CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
+# bool for whether or not the client is logged in
 logged_in = [False]
 
 
@@ -132,8 +132,11 @@ def listen_from_server(client, logged_in):
         print_commands()
         return True
     elif operation == DELETE:
-        logged_in[0] = False
-        print("[SERVER] " + message_data)
+        if message_data == ":::":
+            print("[SERVER] Logging out: current account deleted.")
+            logged_in[0] = False
+        else:
+            print("[SERVER] " + message_data)
         return True
     elif operation == DISCONNECT:
         logged_in[0] = False
@@ -141,14 +144,14 @@ def listen_from_server(client, logged_in):
         return False
 
 
-# get hashed password
+# get hashed password for client-side encryption
 def get_hashed_password(password):
     h = blake2b(key=CLIENT_KEY, digest_size=16)
     h.update(password.encode(FORMAT))
     return h.hexdigest()
 
 
-# prompts user to register an account, and returns whether or not it was successful
+# prompts user to register an account; returns successfullness of client side's operaton
 def register_user(client):
     while True:
         register = input("Would you like to register for a new account? (yes/no) ")
@@ -158,16 +161,19 @@ def register_user(client):
             if not username:
                 print("Username cannot be empty.")
                 continue
+            # user cannot contain ":"
             if ":" in username:
                 print("Username cannot contain ':'")
                 continue
+            # checks that passwords match
             password = input("Password: ")
-
             re_password = input("Re-enter password: ")
             if password != re_password:
                 print("Passwords do not match.")
                 continue
+
             password = get_hashed_password(password)
+            # send register to server
             send(client, f"{username}~:>{password}", REGISTER)
             return True
         elif register.lower() == 'no':
@@ -175,7 +181,7 @@ def register_user(client):
             return False
 
 
-# prompts user to login, and return whether or not it was successful
+# prompts user to login; listen on the listening thread to whether it's successful
 def login_user(client):
     while True:
         login = input("Would you like to log in? (yes/no) ")
@@ -187,6 +193,7 @@ def login_user(client):
                 continue
             password = input("Password: ")
             password = get_hashed_password(password)
+            # send login request to server
             send(client, f"{username}~:>{password}", LOGIN)
             return True
         elif login.lower() == 'no':
@@ -194,7 +201,7 @@ def login_user(client):
             return False
 
 
-# delete the current user, and returns whether or not account is deleted
+# delete the current user; listens on the listening thread whether it's successful
 def delete_user(client, account):
     if not account and not logged_in[0]:
         print("Please login or specify the account to delete.")
@@ -215,11 +222,14 @@ def delete_user(client, account):
 
 # force disconnect from server
 def forced_disconnect(client):
-    print("\nDisconnected from server.")
-    send(client, "", DISCONNECT)
-    time.sleep(0.5)
-    client.close()
-    exit(0)
+    try: 
+        print("\nDisconnected from server.")
+        send(client, "", DISCONNECT)
+        time.sleep(0.5)
+        client.close()
+        exit(0)
+    except Exception as e:
+        exit(0)
 
 
 # prints out the help menu
@@ -233,6 +243,7 @@ def print_help():
     print("\t<user>: <message>: send a message to a user.")
 
 
+# helpful commands
 def print_commands():
     print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./disconnect. Type ./help for more info.")
 
@@ -260,7 +271,7 @@ def disconnect_client(client):
         send(client, "", DISCONNECT)
 
 
-# main function
+# main function for starting the client server connection, listening for messages, and sending messages
 def start():
     
     # configure the server address
@@ -286,7 +297,7 @@ def start():
     client = connect(PORT, SERVER)
     if client is None:
         return 
-    # handle ctrl-z and ctrl-c
+    # handles when ctrl-z and ctrl-c happen: disconnects client
     signal.signal(signal.SIGTSTP, lambda x, y: forced_disconnect(client))
     signal.signal(signal.SIGINT, lambda x, y: forced_disconnect(client))
 
@@ -300,21 +311,24 @@ def start():
     if successful:
         send(client, "", UNREAD)
 
-    # input thread for user messages that handles different commands
+    # Input matching for different user commands
     while True:
         try: 
             message = input()
             message_lower = message.lower()
+            # if not message, continue
             if not message:
                 continue
+            # if message is a command, handle it
             elif message_lower == "./help":
                 print_help()
             elif message[:6] == "./list":
-                # TODO: MAGIC WORD
+                # list all users containing the magic word
                 magic_word = message[7:].strip().lower()
                 send(client, magic_word, LIST)
             elif message_lower == "./register":
                 successful = register_user(client)
+                # wait a bit for server to print out the response message
                 time.sleep(0.5)
                 if not successful:
                     register_user(client)
@@ -329,6 +343,7 @@ def start():
             elif message_lower == "./disconnect":
                 disconnect_client(client)
                 break
+            # if message is a message, send it
             else:
                 send(client, message, SEND)
         

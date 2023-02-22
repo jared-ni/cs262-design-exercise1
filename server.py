@@ -11,7 +11,7 @@ FORMAT = "utf-8"
 BYTE_ORDER = "big"
 
 """
-wired protocol definitions: 
+wired protocol header definitions: 
 1. version (1 bytes)
 2. operation code (1 bytes)
 3. header length (1 byte)
@@ -32,12 +32,8 @@ UNREAD = 8
 DISCONNECT = 9
 defined_operations = set([REGISTER, LOGIN, LIST, DELETE, SEND, RECEIVE, 
                           SERVER_MESSAGE, UNREAD, DISCONNECT])
-p_sizes = {
-    "ver": 1,
-    "op": 1,
-    "h_len": 1,
-    "m_len": 2
-}
+# wired protocol header sizes
+p_sizes = { "ver": 1, "op": 1, "h_len": 1, "m_len": 2 }
 
 
 # bind server to current address and allow for reconnections
@@ -47,9 +43,10 @@ server.bind(ADDR)
 
 # dictionary for storing user information
 users = {}
-users_lock = threading.Lock()
 # dictionary for storing clients and maps socket to user
 clients = {}
+# locks for preventing race conditions in users and clients
+users_lock = threading.Lock()
 clients_lock = threading.Lock()
 
 
@@ -68,9 +65,10 @@ def send(client, msg, operation_code):
     client.send(version + operation + header_length + message_length + message)
 
 
-# hash password again for storage
+# hash password again: server side encryption
 def hash_password(password):
     return bcrypt.hashpw(password.encode(FORMAT), bcrypt.gensalt())
+
 
 # return true if password matches hashed password
 def check_password(password, hashed_password):
@@ -89,14 +87,12 @@ def handle_register(client, payload):
             send(client, "Username already exists!", SERVER_MESSAGE)
             return
         # add new user to clients dictionary
-        # TODO: remove "messages"
         with users_lock:
             users[username] = {
-                # TODO: hash password
+                # hashed password
                 "password": hash_password(password),
                 "client": None,
                 "logged_in": False,
-                "messages": [],
                 "unread": deque()
             }
         send(client, f"Successfully registered {username}!", REGISTER)
@@ -104,7 +100,7 @@ def handle_register(client, payload):
         return
     
 
-# handle account login
+# handle account login: sends to client's listening thread whether server-side login was successful
 def handle_login(client, payload):
     if not payload:
         return 
@@ -147,11 +143,13 @@ def handle_login(client, payload):
         return
     
 
-# handle sending messages
+# handle sending messages between two users
 def handle_send(client, payload):
+    # check if sender is logged in
     if client not in clients:
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
+    # if no message, return
     if not payload:
         return
     
@@ -159,14 +157,15 @@ def handle_send(client, payload):
     receiverEnd = payload.find(":")
     message = payload[receiverEnd+1:]
     if receiverEnd == -1 or not message:
-        send(client, "Syntax for sending a message to a user: <username>: <message>. Type ./help for additional commands.", SERVER_MESSAGE)
+        send(client, "Syntax for sending a message to a user: <username>: <message>. Type ./help for additional commands.", 
+             SERVER_MESSAGE)
         return
     receiver = payload[:receiverEnd]
     if receiver not in users:
         send(client, f"User {receiver} does not exist!", SERVER_MESSAGE)
         return
 
-    # send message to receiver immediately
+    # send message to receiver immediately if they are logged in
     # adds message to receiver's unread array if receiver is not logged in
     with users_lock:
         receiver_socket = users[receiver]["client"]
@@ -192,7 +191,6 @@ def handle_unread(client):
     return True
 
 
-
 # print out all users registered with text wildcard
 def handle_list(client, payload):
     if not payload or payload == "*":
@@ -216,21 +214,36 @@ def handle_list(client, payload):
 # delete current user's account
 def handle_delete(client, payload):
     username, password = payload.split("~:>")
-    if not username:
+    print("username: ", username)
+    print("password: ", password)
+    if not username and client in clients:
+        print("!")
         username = clients[client]
-    if username not in users:
+    if not username or username not in users:
+        print("!!")
         send(client, f"Account {username} does not exist!", SERVER_MESSAGE)
         return
     if not check_password(password, users[username]["password"]):
+        print("!!!")
         send(client, f"Incorrect password for account {username}!", SERVER_MESSAGE)
         return
     else:
+        # if deleting current client's account, log them out
+        if client in clients and clients[client] == username:
+            send(client, f":::", DELETE)
+        print(clients)
+        print(users)
+
         with clients_lock:
             deleted_client = users[username]["client"]
-            send(deleted_client, f"Logged out: Account {username} has been deleted.", DELETE)
-            del clients[deleted_client]
+            if deleted_client is not None:
+                send(deleted_client, f"Logged out: Account {username}", DELETE)
+                del clients[deleted_client]
         with users_lock:
             del users[username]
+        
+        print(clients)
+        print(users)
     
         send(client, f"Successfully deleted user {username}", DELETE)
 
