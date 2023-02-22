@@ -180,11 +180,9 @@ class Client:
             elif response.success and n.username == self.username:
                 self.username = ""
                 print("Account deleted. You have been logged out.")
-                return True
             elif response.success:
                 print(f"Account {n.username} has been deleted.")
-                return True
-        return False
+        return True
     
 
     # prints out the help menu
