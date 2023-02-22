@@ -48,7 +48,7 @@ server.bind(ADDR)
 # dictionary for storing user information
 users = {}
 users_lock = threading.Lock()
-# dictionary for storing clients. maps socket to user
+# dictionary for storing clients and maps socket to user
 clients = {}
 clients_lock = threading.Lock()
 
@@ -114,16 +114,16 @@ def handle_login(client, payload):
         if username not in users:
             send(client, "Username does not exist!", SERVER_MESSAGE)
             return
-        # TODO: hash password
+        # hashes password
         if not check_password(password, users[username]["password"]):
             send(client, "Incorrect password!", SERVER_MESSAGE)
             return
         
-        # TODO: lock clients dictionary
+        # locks clients dictionary when changing global dictionary
         with users_lock:
             users[username]["logged_in"] = True
         # if client was previously logged in, log them out
-        # TODO: log out user on previous client
+        # logs out user on previous client
         if username in users and users[username]["client"] is not None:
             prev_client = users[username]["client"]
             with clients_lock:
@@ -155,8 +155,7 @@ def handle_send(client, payload):
     if not payload:
         return
     
-    # try:
-        # get receiver and message
+    # get receiver and message
     receiverEnd = payload.find(":")
     message = payload[receiverEnd+1:]
     if receiverEnd == -1 or not message:
@@ -167,8 +166,8 @@ def handle_send(client, payload):
         send(client, f"User {receiver} does not exist!", SERVER_MESSAGE)
         return
 
-    # send message to receiver
-    # TODO: what to do when receiver is not logged in?
+    # send message to receiver immediately
+    # adds message to receiver's unread array if receiver is not logged in
     with users_lock:
         receiver_socket = users[receiver]["client"]
         if not users[receiver]["logged_in"]:
@@ -194,8 +193,7 @@ def handle_unread(client):
 
 
 
-# print out all users registered
-# TODO: apply some regex to filter out users
+# print out all users registered with text wildcard
 def handle_list(client, payload):
     if not payload or payload == "*":
         # Lists all users in the users dict
@@ -239,13 +237,11 @@ def handle_delete(client, payload):
 
 # handle disconnect
 def handle_disconnect(client):
-    # TODO: if user is not logged in? 
     if client not in clients:
         send(client, "You are not logged in! Type ./help for instructions.", SERVER_MESSAGE)
         return
     
     username = clients[client]
-    # TODO: make user handle multiple client logins
     with users_lock:
         if username and username in users:
             users[username]["client"] = None
@@ -263,27 +259,24 @@ def handle_client(conn, addr):
     try: 
         connected = True
         while connected:
-            # Parse wired protocol header
-            # TODO: need to break when get disconnect message
+            # parse wired protocol header
             # 1. client version number must match server version number
             version = int.from_bytes(conn.recv(p_sizes["ver"]), BYTE_ORDER)
             if version != VERSION:
                 print(f"Version {version} not supported!")
-                # TODO: send message to client to disconnect it
                 return
             # 2. operation code
             operation = int.from_bytes(conn.recv(p_sizes["op"]), BYTE_ORDER)
             if operation not in defined_operations:
                 print(f"Operation {operation} not supported!")
-                # TODO: send message to client to disconnect it
                 return 
-            # TODO: not sure what to do with header_length
+            # 3. header length
             header_length = int.from_bytes(conn.recv(p_sizes["h_len"]), BYTE_ORDER)
             if header_length != 5:
                 print(f"Header length {header_length} not supported!")
-            # 3. message length
+            # 4. message length
             message_length = int.from_bytes(conn.recv(p_sizes["m_len"]), BYTE_ORDER)
-            # 4. message data
+            # 5. message data
             message_data = conn.recv(message_length).decode(FORMAT)
 
             # handle specific operation
@@ -302,7 +295,6 @@ def handle_client(conn, addr):
             elif operation == DISCONNECT:
                 raise Exception
     except:
-        # TODO: What do we do when client disconnects?
         print(f"[{addr}] disconnected.")
         handle_disconnect(conn)
 

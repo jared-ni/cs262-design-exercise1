@@ -42,7 +42,7 @@ CLIENT_KEY = b'cs262IsFunAndWaldoIsCool'
 logged_in = [False]
 
 
-# send client message as per standards defined by the wired protocol
+# sends client message as per standards defined by the wired protocol
 def send(client, msg, operation_code):
     # 1. version
     version = VERSION.to_bytes(1, BYTE_ORDER)
@@ -68,7 +68,7 @@ def send(client, msg, operation_code):
         forced_disconnect(client)
 
 
-# Continually listens to messages from server on another thread
+# continually listens to messages from server on another thread
 def listening_thread(client):
     connected = True
     while connected:
@@ -88,10 +88,10 @@ def listening_thread(client):
             forced_disconnect(client)
 
 
-# a separate thread for listening to messages from server that are par the wired protocol.
-# Returns True on success, False on failure
+# listens to messages from server on separate thread per the wired protocol.
+# returns True on success, False on failure
 def listen_from_server(client, logged_in):
-    # Unpacks header data of the message from server
+    # unpacks header data of the message from server
     version = int.from_bytes(client.recv(p_sizes["ver"]), BYTE_ORDER)
     if not version: 
         print(f"Server/Client connection might be lost.")
@@ -104,17 +104,17 @@ def listen_from_server(client, logged_in):
     if operation not in defined_operations:
         print(f"Operation {operation} not supported!")
         forced_disconnect(client)
-    # TODO: not sure what to do with header_length
+    # 3. header length
     header_length = int.from_bytes(client.recv(p_sizes["h_len"]), BYTE_ORDER)
     if header_length != 5:
         print(f"Header length {header_length} not supported!")
         forced_disconnect(client)
-    # 3. message length
+    # 4. message length
     message_length = int.from_bytes(client.recv(p_sizes["m_len"]), BYTE_ORDER)
-    # 4. message data
+    # 5. message data
     message_data = client.recv(message_length).decode(FORMAT)
 
-    # Case matching based on operation code
+    # case matching based on operation code
     if operation == RECEIVE:
         username, content = message_data.split("~:>")
         print(f"([{username}] {content})")
@@ -148,7 +148,7 @@ def get_hashed_password(password):
     return h.hexdigest()
 
 
-# prompts user to register an account. Returns whether successful
+# prompts user to register an account, and returns whether or not it was successful
 def register_user(client):
     while True:
         register = input("Would you like to register for a new account? (yes/no) ")
@@ -164,7 +164,6 @@ def register_user(client):
             if password != re_password:
                 print("Passwords do not match.")
                 continue
-            # TODO: Hash password
             password = get_hashed_password(password)
             send(client, f"{username}~:>{password}", REGISTER)
             return True
@@ -173,12 +172,12 @@ def register_user(client):
             return False
 
 
-# prompts user to login. Return whether successful
+# prompts user to login, and return whether or not it was successful
 def login_user(client):
     while True:
         login = input("Would you like to log in? (yes/no) ")
         if login.lower() == 'yes':
-            # log in the user
+            # logs in the user
             username = input("Username: ")
             if not username:
                 print("Username cannot be empty.")
@@ -192,7 +191,7 @@ def login_user(client):
             return False
 
 
-# delete the current user. Return whether account is deleted
+# delete the current user, and returns whether or not account is deleted
 def delete_user(client, account):
     if not account and not logged_in[0]:
         print("Please login or specify the account to delete.")
@@ -211,7 +210,7 @@ def delete_user(client, account):
             return False
         
 
-# forced disconnect from server
+# force disconnect from server
 def forced_disconnect(client):
     print("\nDisconnected from server.")
     send(client, "", DISCONNECT)
@@ -235,7 +234,7 @@ def print_commands():
     print("Commands: <user>: <message>, ./list, ./register, ./login, ./delete, ./disconnect. Type ./help for more info.")
 
 
-# 1. connect client to server
+# attempts to connects client to server
 def connect(PORT, SERVER):
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
@@ -247,7 +246,7 @@ def connect(PORT, SERVER):
         return None
 
 
-# disconnect_client
+# disconnects client when called
 def disconnect_client(client):
     if not logged_in[0]:
         print("\n[DISCONNECTED]")
