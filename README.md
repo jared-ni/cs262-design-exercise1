@@ -5,8 +5,21 @@ Clone the repository
 ```bash
 git clone https://github.com/jared-ni/cs262-design-exercise1.git
 ```
-Then, cd into the repository, and run the server (python server.py or python grpc/chat_gserver.py).
-Then, run the client (python client.py or python grpc/chat_gclient.py), give the host server address as the command line argument (or leave blank to run on localhost).
+Then, cd into the repository, and run either the socket or the gRPC server
+```
+python server.py
+```
+```
+python grpc/chat_gserver.py
+```
+Then, run the corresponding client:
+```
+python client.py
+```
+```
+python grpc/chat_gclient.py
+```
+Give the host server address as the command line argument (or leave blank to run on localhost).
 
 ## Installation
 ```bash
