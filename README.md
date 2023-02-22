@@ -1,7 +1,5 @@
 # cs262-design-exercise1
 
-"gives a set of instructions on setting up the client and server so that the system can be run"
-
 ## Installation
 ```bash
 pip install -r requirements.txt 
@@ -25,6 +23,7 @@ where <host> is the address of the machine the server is currently running on.
 
 If multiple clients want to connect, repeat the above step in another terminal.
 
+
 ## Setting up Server and Client(s) (Part 2: Python GRPC)
 Open a terminal, nagivate to the grpc directory with chat_gserver.py and chat_gclient.py, and run the server by typing 
 ```bash
@@ -37,11 +36,12 @@ python chat_gclient.py
 ```
 Else, if the server is running on a different machine as the client, run
 ```bash
-python chat_gclient.py {host}
+python chat_gclient.py <host>
 ```
-where {host} is the address of the machine the server is currently running on.
+where \<host\> is the address of the machine the server is currently running on.
 
 If multiple clients want to connect, repeat the above step in another terminal.
+
 
 ## Navigating the Chat App
 For both sockets and GRPC implementations, once the client connects to the server, 
@@ -51,16 +51,38 @@ to log in. Once logged in, the user receives any unseen messages sent to them wh
 they were logged out.
 
 Now, the user has access to various functionalities by typing:
-**<username>: <message>**: sends <message> to <username> if <username> exists; sends immediately if <username> is logged on, else queues the message on the server.
+
+**\<username\>: \<message\>**: sends \<message\> to \<username\> if \<username\> exists; sends immediately if \<username\> is logged on, else queues the message on the server.
+
 **./register**: registers another user
+
 **./login**: logs in another user
+
 __./list *__: lists all users registered in the server; * is the text wildcard
-**./delete <username>**: deletes <username> from server (prompts for <username> password)
+
+**./delete \<username\>**: deletes \<username\> from server (prompts for \<username\> password)
+
 **./disconnect**: logs user out (if logged in) and disconnects client, ending session
+
 **./help**: lists these above commands in case user forgets
 
+
 ## Running Unit Tests
-For 
+For testing socket implementation (part 1), open up a terminal and nagivate to the 
+directory containing server.py and client.py. Start the server by typing
+```bash
+python server.py
+```
+
+Now, open up another terminal and nagivate to the same directory and type
+```bash
+python -m unittest test_client.py
+```
+This will run all unit tests, testing individual functions of client.py and making
+sure that messages are sent correctly from client to server to client.
+
+
+
 
 python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto
 
