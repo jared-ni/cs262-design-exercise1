@@ -6,6 +6,7 @@ import chat_pb2_grpc as rpc
 from collections import deque
 import threading
 import bcrypt
+import socket
 
 
 class ChatServer(rpc.ChatServerServicer):
@@ -182,7 +183,8 @@ if __name__ == '__main__':
     rpc.add_ChatServerServicer_to_server(ChatServer(), server)
     print('[SERVER STARTING] Listening on port ' + str(port) + '...')
 
-    server.add_insecure_port('10.250.151.166:' + str(port))
+    addr_host = socket.gethostbyname(socket.gethostname())
+    server.add_insecure_port(f'{addr_host}:{port}')
     server.start()
 
     server.wait_for_termination()

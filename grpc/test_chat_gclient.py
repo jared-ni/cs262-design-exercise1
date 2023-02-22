@@ -9,7 +9,9 @@ import time
 
 class ChatServerTest(unittest.TestCase):
     @classmethod
-    def setUpClass(cls):
+    @mock.patch('chat_gclient.input', create=True)
+    def setUpClass(cls, mock_input):
+        mock_input.side_effect = ["yes"]
         cls.channel = grpc.insecure_channel('localhost:43210')
         cls.conn = rpc.ChatServerStub(cls.channel)
         cls.client = chat_gclient.Client()

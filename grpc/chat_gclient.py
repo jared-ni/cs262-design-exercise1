@@ -7,6 +7,7 @@ from hashlib import blake2b
 import sys
 import errno
 import signal
+import socket
 
 # Generate grpc server code by running 
 # 'python3 -m grpc_tools.protoc -I protos --python_out=. --grpc_python_out=. protos/gchat.proto'
@@ -19,7 +20,7 @@ class Client:
     def __init__(self):
         # the frame to put ui components on
         self.username = ""
-        self.address = 'localhost'
+        self.address = socket.gethostbyname(socket.gethostname())
         self.port = 43210
 
         # configure server address, if on Jared's Mac, try 10.250.151.166
