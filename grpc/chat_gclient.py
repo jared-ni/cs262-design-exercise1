@@ -18,7 +18,10 @@ class Client:
         # create a gRPC channel + stub
         channel = grpc.insecure_channel(address + ':' + str(port))
         self.conn = rpc.ChatServerStub(channel)
-        
+
+    
+    # call to start everything
+    def start(self):
         # create new listening thread for when new message streams come in
         threading.Thread(target=self.__listen_for_messages, daemon=True).start()
         
@@ -67,7 +70,8 @@ class Client:
                 n.username = username
                 n.password = self.get_hashed_password(password)
                 response = self.conn.CreateAccount(n)
-                print(response.message)
+                print("response: ")
+                print(response)
                 if response.success:
                     return True
                 return False
@@ -91,7 +95,8 @@ class Client:
                 n.password = self.get_hashed_password(password)
                 response = self.conn.Login(n)
 
-                print(response.message)
+                print("login")
+                print(response)
                 if response.success:
                     self.username = username
                     return True
@@ -135,7 +140,7 @@ class Client:
         n.password = self.get_hashed_password(n.password)
         response = self.conn.DeleteAccount(n)
 
-        if response.success:
+        if response.success and n.username == self.username:
             self.username = ""
         print(response.message)
 
@@ -190,4 +195,5 @@ class Client:
     
 
 if __name__ == '__main__':
-    Client()  # this starts a client and thus a thread which keeps connection to server open
+    client = Client()  # this starts a client and thus a thread which keeps connection to server open
+    client.start()
