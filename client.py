@@ -158,6 +158,9 @@ def register_user(client):
             if not username:
                 print("Username cannot be empty.")
                 continue
+            if ":" in username:
+                print("Username cannot contain ':'")
+                continue
             password = input("Password: ")
 
             re_password = input("Re-enter password: ")

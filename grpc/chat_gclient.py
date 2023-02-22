@@ -22,7 +22,7 @@ class Client:
         self.address = 'localhost'
         self.port = 43210
 
-        # configure server address, if on Jared's Mac, try 10.250.151.166, or 10.250.0.1
+        # configure server address, if on Jared's Mac, try 10.250.151.166
         try:
             while True:
                 response = input("Is the server on this machine? (yes/no) ")
@@ -53,6 +53,7 @@ class Client:
         self.communicate_with_server()
 
 
+    # listening thread for incoming messages from other users
     def __listen_for_messages(self):
         for note in self.conn.ChatStream(chat.Empty()):
             print(">[{}] {}".format(note.sender, note.message))
@@ -126,8 +127,7 @@ class Client:
                 n.password = self.get_hashed_password(password)
                 response = self.conn.Login(n)
 
-                print("login: ")
-                print(response.success)
+                print(response.message)
                 if response.success:
                     self.username = username
                     return True
