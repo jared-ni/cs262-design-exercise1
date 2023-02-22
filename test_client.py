@@ -116,6 +116,25 @@ class TestClient(TestCase):
         client_test.close()
         self.assertEqual(cm.exception.code, 0)
 
+    @mock.patch('client.input', create=True)
+    def test_send(self, mocked_input):
+        client_test1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_test1.connect((socket.gethostbyname(socket.gethostname()), 48789))
+
+        client_test2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_test2.connect((socket.gethostbyname(socket.gethostname()), 48789))
+        
+        mocked_input.side_effect = ["yes", "user1", "1", "yes", "user2", "2", "2", "yes", "user2", "2"]
+        client.login_user(client_test1)
+        client.register_user(client_test2)
+        client.login_user(client_test2)
+        
+        client.send(client_test1, "user2: test", SEND)
+        result = client.listen_from_server(client_test2, [True])
+        client_test1.close()
+        client_test2.close()
+        self.assertEqual(result, True)
+
 if __name__ == '__main__':
     unittest.main()
 
